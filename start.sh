@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-echo "✅ Starting Uvicorn server with correct environment..."
+echo "✅ Starting Uvicorn server (Python3)..."
 
-python --version || which python
-pip show uvicorn || echo "⚠️ uvicorn not installed in this environment."
+PYTHON_PATH=$(which python3)
+echo "Using Python: $PYTHON_PATH"
+$PYTHON_PATH --version
 
-# 強制使用同一個環境的 python
-exec python -m uvicorn main:app --host 0.0.0.0 --port 10000
+# 執行服務
+exec $PYTHON_PATH -m uvicorn main:app --host 0.0.0.0 --port 10000
