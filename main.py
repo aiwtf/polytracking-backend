@@ -198,6 +198,12 @@ class MarketMonitor:
                             if not message:
                                 continue
                             
+                            # [DEBUG] Log raw message to see what we are getting
+                            if len(message) < 1000:
+                                logger.info(f"RAW MSG: {message}")
+                            else:
+                                logger.info(f"RAW MSG (truncated): {message[:200]}...")
+
                             try:
                                 data = json.loads(message)
                                 await self.process_message(data)
