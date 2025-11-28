@@ -237,12 +237,29 @@ class MarketMonitor:
             await self.process_single_msg(data)
 
     async def process_single_msg(self, msg):
-        # 確保是交易數據 (Trades)
-        if "trades" not in str(msg):
+        event_type = msg.get("event_type")
+
+        # 1. Handle Price Changes (Level 2)
+        if event_type == "price_change":
+            for item in msg.get("price_changes", []):
+                asset_id = item.get("asset_id")
+                try:
+                    price = float(item.get("price", 0))
+                except (ValueError, TypeError):
+                    continue
+                
+                if asset_id in self.markets:
+                    # Update price for volatility check
+                    self.check_volatility(asset_id, price)
             return
 
-        # 解析數據
-        for trade in msg.get("data", []):
+        # 2. Handle Trades (event_type="trade" or implicit)
+        # Look for "data" or "trades" list
+        data_list = msg.get("data", [])
+        if not data_list and "trades" in msg:
+            data_list = msg.get("trades", [])
+            
+        for trade in data_list:
             asset_id = trade.get("asset_id")
             try:
                 price = float(trade.get("price", 0))
@@ -250,12 +267,8 @@ class MarketMonitor:
             except (ValueError, TypeError):
                 continue
             
-            # 只有當這是我們監控的 ID 時才處理
             if asset_id in self.markets:
-                # [DEBUG] 心跳日誌：證明程式有看到數據 (不會發 TG)
                 logger.info(f"👁️ Seen trade | Price: {price:.4f} | Size: ${size*price:.2f}")
-                
-                # 執行檢查
                 self.check_whale(asset_id, size, price)
                 self.check_volatility(asset_id, price)
 
