@@ -1,38 +1,15 @@
-<<<<<<< HEAD
-# Use python:3.9-slim as base image
+# 使用輕量級 Python 3.9
 FROM python:3.9-slim
 
-# Set working directory
+# 設定工作目錄
 WORKDIR /app
 
-# Copy requirements first to leverage cache
+# 先複製 requirements.txt 並安裝依賴 (利用 Docker Cache 加速)
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# 複製其餘程式碼
 COPY . .
 
-# Command to run the application
-# Render sets the PORT environment variable automatically
+# 啟動指令 (讓 Render 動態注入 PORT)
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
-=======
-# 使用 Python 3.13
-FROM python:3.13-slim
-
-WORKDIR /app
-
-# 安裝套件
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 複製程式碼
-COPY . .
-
-# 暴露 Render 需要的 port
-EXPOSE 10000
-
-# 啟動 FastAPI
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
->>>>>>> 11db5788de2a15efac177cdec7d3ba2b0219c043
