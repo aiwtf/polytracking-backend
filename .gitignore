@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .git
 __pycache__
 .env
@@ -6,3 +7,25 @@ markets.db
 venv/
 .idea/
 .vscode/
+=======
+# Environment
+.env
+*.out
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+>>>>>>> 11db5788de2a15efac177cdec7d3ba2b0219c043
