@@ -44,8 +44,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@Polytracking")
 TELEGRAM_THREAD_ID = int(os.getenv("TELEGRAM_THREAD_ID", "4"))
 
 # Thresholds
-VOLATILITY_THRESHOLD = 0.02
-WHALE_THRESHOLD_USDC = 50000
+# 測試用超低門檻 (Test Thresholds)
+VOLATILITY_THRESHOLD = 0.001  # 0.1% (只要價格動一點點就通知)
+WHALE_THRESHOLD_USDC = 10     # 10 USD (只要有人買便當就通知)
 
 # --- Database Setup ---
 engine = create_engine(DATABASE_URL)
@@ -222,15 +223,35 @@ class MarketMonitor:
             await asyncio.sleep(5)
 
     async def process_message(self, data):
-        if "trades" in str(data): 
-             for trade in data.get("data", []):
-                 asset_id = trade.get("asset_id")
-                 price = float(trade.get("price", 0))
-                 size = float(trade.get("size", 0))
-                 
-                 if asset_id in self.markets:
-                     self.check_whale(asset_id, size, price)
-                     self.check_volatility(asset_id, price)
+        # 兼容性處理：Polymarket 有時傳回 List，有時傳回 Dict
+        if isinstance(data, list):
+            for item in data:
+                await self.process_single_msg(item)
+        elif isinstance(data, dict):
+            await self.process_single_msg(data)
+
+    async def process_single_msg(self, msg):
+        # 確保是交易數據 (Trades)
+        if "trades" not in str(msg):
+            return
+
+        # 解析數據
+        for trade in msg.get("data", []):
+            asset_id = trade.get("asset_id")
+            try:
+                price = float(trade.get("price", 0))
+                size = float(trade.get("size", 0))
+            except (ValueError, TypeError):
+                continue
+            
+            # 只有當這是我們監控的 ID 時才處理
+            if asset_id in self.markets:
+                # [DEBUG] 心跳日誌：證明程式有看到數據 (不會發 TG)
+                logger.info(f"👁️ Seen trade | Price: {price:.4f} | Size: ${size*price:.2f}")
+                
+                # 執行檢查
+                self.check_whale(asset_id, size, price)
+                self.check_volatility(asset_id, price)
 
     def check_volatility(self, asset_id, new_price):
         last_price = self.last_prices.get(asset_id)
