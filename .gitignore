@@ -1,0 +1,8 @@
+.git
+__pycache__
+.env
+markets.db
+*.pyc
+venv/
+.idea/
+.vscode/

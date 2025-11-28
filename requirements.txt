@@ -1,0 +1,10 @@
+py-clob-client
+websocket-client
+websockets
+requests
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+python-dotenv
