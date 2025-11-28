@@ -44,8 +44,8 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@Polytracking")
 TELEGRAM_THREAD_ID = int(os.getenv("TELEGRAM_THREAD_ID", "4"))
 
 # Thresholds
-VOLATILITY_THRESHOLD = 0.10
-WHALE_THRESHOLD_USDC = 10000
+VOLATILITY_THRESHOLD = 0.02
+WHALE_THRESHOLD_USDC = 50000
 
 # --- Database Setup ---
 engine = create_engine(DATABASE_URL)
