@@ -236,28 +236,15 @@ class MarketMonitor:
             await self.process_single_msg(data)
 
     async def process_single_msg(self, msg):
-        event_type = msg.get("event_type")
-
-        # 1. Handle Price Changes (Level 2)
-        if event_type == "price_change":
-            for item in msg.get("price_changes", []):
-                asset_id = item.get("asset_id")
-                try:
-                    price = float(item.get("price", 0))
-                except (ValueError, TypeError):
-                    continue
-                
-                if asset_id in self.markets:
-                    # Update price for volatility check
-                    self.check_volatility(asset_id, price)
-            return
-
-        # 2. Handle Trades (event_type="trade" or implicit)
-        # Look for "data" or "trades" list
+        # 確保是交易數據 (Trades)
+        # Polymarket 的 trade 事件通常包含 "data" 或 "trades" 列表
         data_list = msg.get("data", [])
         if not data_list and "trades" in msg:
             data_list = msg.get("trades", [])
             
+        if not data_list:
+            return
+
         for trade in data_list:
             asset_id = trade.get("asset_id")
             try:
