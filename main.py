@@ -1,5 +1,6 @@
 import asyncio
 import json
+from json import JSONDecodeError
 import logging
 import os
 import requests
@@ -193,8 +194,16 @@ class MarketMonitor:
                     while not self.should_reconnect and self.running:
                         try:
                             message = await websocket.recv()
-                            data = json.loads(message)
-                            await self.process_message(data)
+                            if not message:
+                                continue
+                            
+                            try:
+                                data = json.loads(message)
+                                await self.process_message(data)
+                            except JSONDecodeError:
+                                logger.warning("Received non-JSON message")
+                                continue
+                                
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning("WS Connection closed.")
                             break
@@ -208,6 +217,9 @@ class MarketMonitor:
                     await asyncio.sleep(5)
                 else:
                     logger.info("Reconnecting due to config change...")
+            
+            # Prevent rapid looping on failure
+            await asyncio.sleep(5)
 
     async def process_message(self, data):
         if "trades" in str(data): 
