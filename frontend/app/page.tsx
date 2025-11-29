@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 
 // Use the URL provided by the user or fallback to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://polytracking-backend-tv7j.onrender.com";
+// Use the URL provided by the user or fallback to localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const BOT_USERNAME = "@PolytrackingBot";
 
 // --- Types ---
@@ -400,23 +401,46 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
 }
 
 function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: Subscription[], userId: string | undefined | null, onUpdate: () => void }) {
+  // Local state for optimistic updates
+  const [optimisticSubs, setOptimisticSubs] = useState(subscriptions);
+
+  // Sync local state when props change (e.g. from polling)
+  useEffect(() => {
+    setOptimisticSubs(subscriptions);
+  }, [subscriptions]);
+
   const handleToggle = async (id: number, field: keyof TrackingConfig, value: boolean) => {
-    if (!userId) return; // Prevent action if not signed in
+    if (!userId) return;
+
+    // 1. Optimistic Update: Update UI immediately
+    setOptimisticSubs(prev => prev.map(sub =>
+      sub.id === id ? { ...sub, [field]: value } : sub
+    ));
+
     try {
+      // 2. Call API in background
       await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value }),
       });
+      // 3. Sync with server (optional, but good for consistency)
       onUpdate();
     } catch (err) {
       console.error(err);
+      // Revert on error (optional, could add toast here)
+      setOptimisticSubs(subscriptions);
+      alert("Failed to update setting. Please try again.");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!userId) return; // Prevent action if not signed in
+    if (!userId) return;
     if (!confirm("Stop tracking this market?")) return;
+
+    // Optimistic delete
+    setOptimisticSubs(prev => prev.filter(sub => sub.id !== id));
+
     try {
       const res = await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "DELETE",
@@ -431,6 +455,29 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
     } catch (err: any) {
       console.error("Delete error:", err);
       alert(`Failed to delete: ${err.message}`);
+      // Revert
+      setOptimisticSubs(subscriptions);
+    }
+  };
+
+  const handleTestNotification = async (id: number) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/debug/test-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription_id: id, clerk_user_id: userId }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Server returned " + res.status);
+      }
+
+      alert("Test notification sent! Check your Telegram.");
+    } catch (err: any) {
+      console.error("Test notification error:", err);
+      alert(`Failed to send test: ${err.message}`);
     }
   };
 
@@ -438,11 +485,11 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
     <section>
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 px-1">
         <Bell className="text-gray-500" size={20} />
-        Your Watchlist ({subscriptions.length})
+        Your Watchlist ({optimisticSubs.length})
       </h2>
 
       <div className="grid gap-4">
-        {subscriptions.map((sub) => (
+        {optimisticSubs.map((sub) => (
           <div key={sub.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
 
             <div className="flex-1">
@@ -464,16 +511,26 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
               <Toggle icon={<Anchor size={14} />} label="50k" active={sub.notify_whale_50k} onClick={() => handleToggle(sub.id, 'notify_whale_50k', !sub.notify_whale_50k)} />
             </div>
 
-            <button
-              onClick={() => handleDelete(sub.id)}
-              className="text-gray-300 hover:text-red-500 p-2 transition self-end md:self-center"
-            >
-              <Trash2 size={18} />
-            </button>
+            <div className="flex items-center gap-2 self-end md:self-center">
+              <button
+                onClick={() => handleTestNotification(sub.id)}
+                className="text-gray-300 hover:text-yellow-500 p-2 transition cursor-pointer"
+                title="Send Test Notification"
+              >
+                <Zap size={18} />
+              </button>
+              <button
+                onClick={() => handleDelete(sub.id)}
+                className="text-gray-300 hover:text-red-500 p-2 transition cursor-pointer"
+                title="Stop Tracking"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
           </div>
         ))}
 
-        {subscriptions.length === 0 && (
+        {optimisticSubs.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
             <p className="text-gray-500">No markets tracked yet. Search above to add one!</p>
           </div>
@@ -490,7 +547,7 @@ function Toggle({ label, icon, active, onClick }: { label: string, icon?: React.
     <button
       onClick={onClick}
       className={`
-        flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition border
+        flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition border cursor-pointer select-none
         ${active
           ? "bg-blue-600 text-white border-blue-600 shadow-sm"
           : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
