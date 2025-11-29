@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start",
+    "lint": "cd frontend && npm run lint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.555.0",
+    "use-debounce": "^10.0.6"
+  }
+}
