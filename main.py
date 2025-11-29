@@ -550,6 +550,84 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
 
     return {"status": "ok"}
 
+@app.get("/api/proxy/search")
+def search_markets(q: str):
+    """
+    Proxy to Polymarket Gamma API to search for markets.
+    Returns a cleaned list of events with their tradeable options.
+    """
+    if not q:
+        return []
+    
+    url = "https://gamma-api.polymarket.com/events"
+    params = {
+        "q": q,
+        "limit": 20,
+        "closed": "false"
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        cleaned_events = []
+        for event in data:
+            title = event.get("title", "Untitled")
+            image = event.get("icon", "") or event.get("image", "")
+            
+            options = []
+            markets = event.get("markets", [])
+            for market in markets:
+                # Parse JSON fields if they are strings (Polymarket API quirk)
+                try:
+                    outcomes = json.loads(market.get("outcomes", "[]")) if isinstance(market.get("outcomes"), str) else market.get("outcomes", [])
+                    outcome_prices = json.loads(market.get("outcomePrices", "[]")) if isinstance(market.get("outcomePrices"), str) else market.get("outcomePrices", [])
+                    clob_token_ids = json.loads(market.get("clobTokenIds", "[]")) if isinstance(market.get("clobTokenIds"), str) else market.get("clobTokenIds", [])
+                except Exception:
+                    continue
+
+                if not clob_token_ids:
+                    continue
+
+                # Group Item Title (useful for events with multiple sub-markets)
+                group_title = market.get("groupItemTitle", "")
+                
+                for i, outcome_name in enumerate(outcomes):
+                    # Skip if no token ID available for this outcome
+                    if i >= len(clob_token_ids): break
+                    
+                    # Construct a clear display name
+                    display_name = outcome_name
+                    if group_title and group_title != title:
+                         display_name = f"{group_title} - {outcome_name}"
+                    
+                    price = 0.0
+                    if i < len(outcome_prices) and outcome_prices[i]:
+                        try:
+                            price = float(outcome_prices[i])
+                        except ValueError:
+                            price = 0.0
+
+                    options.append({
+                        "name": display_name,
+                        "asset_id": clob_token_ids[i],
+                        "current_price": price
+                    })
+            
+            if options:
+                cleaned_events.append({
+                    "title": title,
+                    "image": image,
+                    "options": options
+                })
+                
+        return cleaned_events
+
+    except Exception as e:
+        logger.error(f"Search API Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch markets")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
