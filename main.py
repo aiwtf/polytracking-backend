@@ -53,7 +53,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "users_v1"
     id = Column(Integer, primary_key=True, index=True)
     clerk_user_id = Column(String, unique=True, index=True, nullable=False)
     telegram_chat_id = Column(String, nullable=True)
@@ -63,9 +63,9 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
 
 class Subscription(Base):
-    __tablename__ = "subscriptions"
+    __tablename__ = "subscriptions_v1"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users_v1.id'), nullable=False)
     asset_id = Column(String, index=True, nullable=False)
     title = Column(String, nullable=False)
     target_outcome = Column(String, nullable=True)
