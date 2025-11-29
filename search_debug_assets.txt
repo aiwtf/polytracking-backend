@@ -1,0 +1,44 @@
+
+--- Testing /public-search with q='tweets' ---
+
+Event 1: Elon Musk # tweets November 21 - November 28, 2025?
+Markets found: 26
+  Market 1:
+    question: Will Elon Musk post 0-19 tweets from November 21 to November 28, 2025?
+    groupItemTitle: <20
+    asset_id: None
+    clobTokenIds: ["37461525191456541711161790692327871542775481342868444350166087483836917948496", "37041227350407004532733649612604654524703064995735451327012419504281765459796"]
+    outcomes: ["Yes", "No"]
+  Market 2:
+    question: Will Elon Musk post 20-39 tweets from November 21 to November 28, 2025?
+    groupItemTitle: 20-39
+    asset_id: None
+    clobTokenIds: ["42181593632843092022418871959499836295336215069715367973468768021804653424332", "33496065979950748002139481757950647786573628720831009481800808537043967889079"]
+    outcomes: ["Yes", "No"]
+  Market 3:
+    question: Will Elon Musk post 40-59 tweets from November 21 to November 28, 2025?
+    groupItemTitle: 40-59
+    asset_id: None
+    clobTokenIds: ["18310393435114523542402275524974436222477973445520759804949508028897835739794", "94887310617427542973976232525103001077166464493956718530885657671457489273165"]
+    outcomes: ["Yes", "No"]
+
+Event 2: Elon Musk # tweets November 25 - December 2, 2025?
+Markets found: 26
+  Market 1:
+    question: Will Elon Musk post 0-19 tweets from November 25 to December 2, 2025?
+    groupItemTitle: <20
+    asset_id: None
+    clobTokenIds: ["14668161128898204909135013710440140187883301059043616662260014856855966233181", "55929072630800893563789557087557297292959118571361230155221396604538209114157"]
+    outcomes: ["Yes", "No"]
+  Market 2:
+    question: Will Elon Musk post 20-39 tweets from November 25 to December 2, 2025?
+    groupItemTitle: 20-39
+    asset_id: None
+    clobTokenIds: ["41841205420284481819913079653992426912738633341064068684032650436035862946105", "36586984587088737199555939219058187019198317008830690245463709818466535224494"]
+    outcomes: ["Yes", "No"]
+  Market 3:
+    question: Will Elon Musk post 40-59 tweets from November 25 to December 2, 2025?
+    groupItemTitle: 40-59
+    asset_id: None
+    clobTokenIds: ["61850905816015868947498811883083923809932417282068508109199814397291457218514", "89578303752605414375150219624883765409375294069841495065763738815816025756281"]
+    outcomes: ["Yes", "No"]

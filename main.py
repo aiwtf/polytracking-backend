@@ -631,21 +631,32 @@ def search_markets(q: str):
                         outcome_prices = json.loads(outcome_prices)
                     except:
                         outcome_prices = []
+
+                # Parse clobTokenIds if it's a string
+                clob_token_ids = market.get("clobTokenIds", [])
+                if isinstance(clob_token_ids, str):
+                    try:
+                        clob_token_ids = json.loads(clob_token_ids)
+                    except:
+                        clob_token_ids = []
                 
-                # Get the price (assuming binary market, index 0 is usually 'No' or 'Long'? Need to check)
-                # For group markets, usually we want the 'Yes' price which is often index 1?
-                # Or if it's a scalar/categorical, it might be different.
-                # Let's try to get the first valid price, or bestAsk if available.
+                # Use the first token ID (usually "Yes" or primary outcome) as asset_id
+                # Polymarket binary: [Yes_Token, No_Token] or similar. 
+                # We need a valid asset_id to track.
+                asset_id = clob_token_ids[0] if clob_token_ids and len(clob_token_ids) > 0 else None
                 
+                if not asset_id:
+                    continue
+
+                # Get the price
                 current_price = 0.0
                 if outcome_prices and len(outcome_prices) > 0:
                     try:
-                        # Polymarket usually returns ["0.12", "0.88"] strings
-                        current_price = float(outcome_prices[0]) # Default to first outcome
+                        current_price = float(outcome_prices[0])
                     except:
                         pass
                 
-                # Fallback to bestAsk if outcomePrices is weird (like ["0", "1"])
+                # Fallback to bestAsk
                 if current_price == 0 or current_price == 1:
                      best_ask = market.get("bestAsk")
                      if best_ask:
@@ -655,7 +666,7 @@ def search_markets(q: str):
                              pass
 
                 valid_markets.append({
-                    "asset_id": market.get("asset_id"),
+                    "asset_id": asset_id,
                     "name": market.get("groupItemTitle") or market.get("question") or "Outcome",
                     "current_price": current_price
                 })

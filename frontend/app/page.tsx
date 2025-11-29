@@ -327,7 +327,8 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Server returned " + res.status);
+        const errMsg = errData.detail ? (typeof errData.detail === 'object' ? JSON.stringify(errData.detail) : errData.detail) : "Server returned " + res.status;
+        throw new Error(errMsg);
       }
 
       onSuccess();
