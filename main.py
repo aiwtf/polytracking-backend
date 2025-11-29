@@ -589,7 +589,7 @@ def search_markets(q: str):
     url = "https://gamma-api.polymarket.com/events"
     params = {
         "q": q,
-        "limit": 20,
+        "limit": 100,
         "closed": "false"
     }
     
@@ -599,14 +599,18 @@ def search_markets(q: str):
         data = response.json()
         
         cleaned_events = []
+        query_lower = q.lower()
+        
         for event in data:
             title = event.get("title", "Untitled")
+            event_matches = query_lower in title.lower()
+            
             image = event.get("icon", "") or event.get("image", "")
             
             options = []
             markets = event.get("markets", [])
             for market in markets:
-                # Parse JSON fields if they are strings (Polymarket API quirk)
+                # Parse JSON fields
                 try:
                     outcomes = json.loads(market.get("outcomes", "[]")) if isinstance(market.get("outcomes"), str) else market.get("outcomes", [])
                     outcome_prices = json.loads(market.get("outcomePrices", "[]")) if isinstance(market.get("outcomePrices"), str) else market.get("outcomePrices", [])
@@ -617,14 +621,19 @@ def search_markets(q: str):
                 if not clob_token_ids:
                     continue
 
-                # Group Item Title (useful for events with multiple sub-markets)
+                # Check if market question or group title matches
+                question = market.get("question", "")
                 group_title = market.get("groupItemTitle", "")
                 
+                market_matches = (query_lower in question.lower()) or (query_lower in group_title.lower())
+                
+                # If neither event title nor market details match, skip this market
+                if not (event_matches or market_matches):
+                    continue
+
                 for i, outcome_name in enumerate(outcomes):
-                    # Skip if no token ID available for this outcome
                     if i >= len(clob_token_ids): break
                     
-                    # Construct a clear display name
                     display_name = outcome_name
                     if group_title and group_title != title:
                          display_name = f"{group_title} - {outcome_name}"

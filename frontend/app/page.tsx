@@ -124,10 +124,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col items-center">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="w-full bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="text-blue-600" />
             <span className="font-bold text-xl tracking-tight">PolyTracking</span>
@@ -136,7 +136,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      <main className="w-full max-w-3xl px-4 py-6 space-y-6 flex-1">
 
         {/* 1. Telegram Connection */}
         <TelegramSection userId={user.id} connected={telegramConnected} />
@@ -178,32 +178,38 @@ function TelegramSection({ userId, connected }: { userId: string, connected: boo
     }
   };
 
+  const handleDisconnect = async () => {
+    // Placeholder for disconnect logic if needed, or just UI for now as requested
+    // For now, we don't have a disconnect endpoint, so maybe just show alert or do nothing
+    // The user asked for UI layout.
+    alert("Disconnect feature coming soon!");
+  };
+
   return (
     <section className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
       <div>
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Zap className="text-yellow-500" size={20} />
-          Telegram Notifications
+        <h2 className="text-lg font-semibold text-gray-900">
+          Telegram alerts
         </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          {connected
-            ? "You are receiving real-time alerts."
-            : "Connect to receive instant alerts for your tracked markets."}
+        <p className="text-xs text-gray-500 mt-0.5">
+          Receive real-time notifications via <span className="text-blue-600">@polytrackingbot</span>
         </p>
       </div>
 
       {connected ? (
-        <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg font-medium">
-          <CheckCircle size={18} />
-          Telegram Connected
-        </div>
+        <button
+          onClick={handleDisconnect}
+          className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+        >
+          Disconnect
+        </button>
       ) : (
         <button
           onClick={handleConnect}
           disabled={loading}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+          className="bg-black text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition"
         >
-          {loading ? "Generating..." : "Connect Telegram"}
+          {loading ? "..." : "Connect"}
         </button>
       )}
     </section>
@@ -254,14 +260,14 @@ function SearchSection({ userId, onSubscribe }: { userId: string, onSubscribe: (
         {results.map((result, idx) => (
           <div key={idx} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition border border-transparent hover:border-gray-100">
             <img src={result.image} alt="" className="w-12 h-12 rounded-full object-cover bg-gray-200" />
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">{result.title}</h3>
-              <div className="mt-2 flex gap-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-gray-900 truncate">{result.title}</h3>
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {result.options.map((opt) => (
                   <button
                     key={opt.asset_id}
                     onClick={() => setSelectedOption({ title: result.title, name: opt.name, asset_id: opt.asset_id })}
-                    className="px-3 py-1 rounded-md text-sm font-medium border border-gray-200 hover:border-blue-500 hover:text-blue-600 transition"
+                    className="px-3 py-1 rounded-md text-sm font-medium border border-gray-200 hover:border-blue-500 hover:text-blue-600 transition whitespace-nowrap flex-shrink-0"
                   >
                     {opt.name} <span className="text-gray-400 text-xs ml-1">${opt.current_price.toFixed(2)}</span>
                   </button>
