@@ -1,0 +1,32 @@
+
+--- Testing param 'q' with query 'Elon' ---
+Found 20 events
+1. Super Bowl Champion 2026
+2. Democratic Presidential Nominee 2028
+3. Fed decision in December?
+4. 2025 National Heads-Up Poker Championship Winner
+5. F1 Drivers Champion
+
+--- Testing param 'query' with query 'Elon' ---
+Found 20 events
+1. Super Bowl Champion 2026
+2. Democratic Presidential Nominee 2028
+3. Fed decision in December?
+4. 2025 National Heads-Up Poker Championship Winner
+5. F1 Drivers Champion
+
+--- Testing param 'q' with query 'tweets' ---
+Found 20 events
+1. Super Bowl Champion 2026
+2. Democratic Presidential Nominee 2028
+3. Fed decision in December?
+4. 2025 National Heads-Up Poker Championship Winner
+5. F1 Drivers Champion
+
+--- Testing param 'query' with query 'tweets' ---
+Found 20 events
+1. Super Bowl Champion 2026
+2. Democratic Presidential Nominee 2028
+3. Fed decision in December?
+4. 2025 National Heads-Up Poker Championship Winner
+5. F1 Drivers Champion

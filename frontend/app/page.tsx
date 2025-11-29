@@ -99,29 +99,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (isSignedIn) {
       fetchData();
+    } else {
+      // Clear data if user signs out
+      setTelegramConnected(false);
+      setSubscriptions([]);
     }
   }, [isSignedIn, fetchData]);
 
   // Render Loading
   if (!isLoaded) return <div className="flex h-screen items-center justify-center">Loading...</div>;
-
-  // Render Landing Page
-  if (!isSignedIn) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">PolyTracking SaaS</h1>
-          <p className="text-gray-600 mb-8">
-            Track Polymarket whales, liquidity spikes, and price surges in real-time.
-            Get instant alerts on Telegram.
-          </p>
-          <div className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            <SignInButton mode="modal" />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col items-center">
@@ -132,20 +118,27 @@ export default function Dashboard() {
             <Activity className="text-blue-600" />
             <span className="font-bold text-xl tracking-tight">PolyTracking</span>
           </div>
-          <UserButton />
+          <div className="flex items-center gap-4">
+            {!isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="text-sm font-medium text-gray-700 hover:text-gray-900">Sign In</button>
+              </SignInButton>
+            )}
+            <UserButton />
+          </div>
         </div>
       </header>
 
       <main className="w-full max-w-3xl px-4 py-6 space-y-6 flex-1">
 
         {/* 1. Telegram Connection */}
-        <TelegramSection userId={user.id} connected={telegramConnected} />
+        <TelegramSection userId={user?.id} connected={telegramConnected} onStatusChange={fetchData} />
 
         {/* 2. Market Search */}
-        <SearchSection userId={user.id} onSubscribe={fetchData} />
+        <SearchSection userId={user?.id} onSubscribe={fetchData} />
 
         {/* 3. Subscription List */}
-        <SubscriptionList subscriptions={subscriptions} userId={user.id} onUpdate={fetchData} />
+        <SubscriptionList subscriptions={subscriptions} userId={user?.id} onUpdate={fetchData} />
 
       </main>
     </div>
@@ -154,11 +147,26 @@ export default function Dashboard() {
 
 // --- Components ---
 
-function TelegramSection({ userId, connected }: { userId: string, connected: boolean }) {
+function TelegramSection({ userId, connected, onStatusChange }: { userId: string | undefined | null, connected: boolean, onStatusChange: () => void }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Polling for status change when token is present (user is connecting)
+  useEffect(() => {
+    if (!token || connected) return;
+
+    const interval = setInterval(async () => {
+      onStatusChange();
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [token, connected, onStatusChange]);
+
   const handleConnect = async () => {
+    if (!userId) {
+      alert("Please sign in to connect Telegram.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/connect_telegram`, {
@@ -216,7 +224,7 @@ function TelegramSection({ userId, connected }: { userId: string, connected: boo
   );
 }
 
-function SearchSection({ userId, onSubscribe }: { userId: string, onSubscribe: () => void }) {
+function SearchSection({ userId, onSubscribe }: { userId: string | undefined | null, onSubscribe: () => void }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery] = useDebounce(query, 500);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -294,11 +302,15 @@ function SearchSection({ userId, onSubscribe }: { userId: string, onSubscribe: (
   );
 }
 
-function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title: string, name: string, asset_id: string }, userId: string, onClose: () => void, onSuccess: () => void }) {
+function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title: string, name: string, asset_id: string }, userId: string | undefined | null, onClose: () => void, onSuccess: () => void }) {
   const [config, setConfig] = useState<TrackingConfig>(DEFAULT_CONFIG);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (!userId) {
+      alert("Please sign in to track markets.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/subscribe`, {
@@ -386,9 +398,9 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
   );
 }
 
-function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: Subscription[], userId: string, onUpdate: () => void }) {
+function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: Subscription[], userId: string | undefined | null, onUpdate: () => void }) {
   const handleToggle = async (id: number, field: keyof TrackingConfig, value: boolean) => {
-    // Optimistic update could be done here in parent state, but for simplicity we just call API and refresh
+    if (!userId) return; // Prevent action if not signed in
     try {
       await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "PATCH",
@@ -402,6 +414,7 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
   };
 
   const handleDelete = async (id: number) => {
+    if (!userId) return; // Prevent action if not signed in
     if (!confirm("Stop tracking this market?")) return;
     try {
       const res = await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {

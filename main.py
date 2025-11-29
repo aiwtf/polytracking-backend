@@ -588,16 +588,16 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
 def search_markets(q: str):
     """
     Proxy to Polymarket Gamma API to search for markets.
-    Returns a cleaned list of events with their tradeable options.
+    Uses /public-search endpoint for better keyword matching.
     """
     if not q:
         return []
     
-    url = "https://gamma-api.polymarket.com/events"
+    # Use public-search endpoint
+    url = "https://gamma-api.polymarket.com/public-search"
     params = {
-        "q": q,
         "limit": 100,
-        "closed": "false"
+        "q": q
     }
     
     try:
@@ -605,71 +605,45 @@ def search_markets(q: str):
         response.raise_for_status()
         data = response.json()
         
-        cleaned_events = []
-        query_lower = q.lower()
+        # public-search returns a dict with 'events' key
+        events = data.get("events", []) if isinstance(data, dict) else data
         
-        for event in data:
-            title = event.get("title", "Untitled")
-            event_matches = query_lower in title.lower()
-            
-            image = event.get("icon", "") or event.get("image", "")
-            
-            options = []
+        results = []
+        
+        for event in events:
+            # Basic validation
+            if not isinstance(event, dict):
+                continue
+                
+            title = event.get("title", "")
             markets = event.get("markets", [])
-            for market in markets:
-                # Parse JSON fields
-                try:
-                    outcomes = json.loads(market.get("outcomes", "[]")) if isinstance(market.get("outcomes"), str) else market.get("outcomes", [])
-                    outcome_prices = json.loads(market.get("outcomePrices", "[]")) if isinstance(market.get("outcomePrices"), str) else market.get("outcomePrices", [])
-                    clob_token_ids = json.loads(market.get("clobTokenIds", "[]")) if isinstance(market.get("clobTokenIds"), str) else market.get("clobTokenIds", [])
-                except Exception:
-                    continue
-
-                if not clob_token_ids:
-                    continue
-
-                # Check if market question or group title matches
-                question = market.get("question", "")
-                group_title = market.get("groupItemTitle", "")
-                
-                market_matches = (query_lower in question.lower()) or (query_lower in group_title.lower())
-                
-                # If neither event title nor market details match, skip this market
-                if not (event_matches or market_matches):
-                    continue
-
-                for i, outcome_name in enumerate(outcomes):
-                    if i >= len(clob_token_ids): break
-                    
-                    display_name = outcome_name
-                    if group_title and group_title != title:
-                         display_name = f"{group_title} - {outcome_name}"
-                    
-                    price = 0.0
-                    if i < len(outcome_prices) and outcome_prices[i]:
-                        try:
-                            price = float(outcome_prices[i])
-                        except ValueError:
-                            price = 0.0
-
-                    options.append({
-                        "name": display_name,
-                        "asset_id": clob_token_ids[i],
-                        "current_price": price
-                    })
             
-            if options:
-                cleaned_events.append({
-                    "title": title,
-                    "image": image,
-                    "options": options
+            if not markets:
+                continue
+            
+            # Extract valid markets
+            valid_markets = []
+            for market in markets:
+                valid_markets.append({
+                    "asset_id": market.get("asset_id"),
+                    "name": market.get("groupItemTitle") or market.get("question") or "Outcome",
+                    "current_price": market.get("outcomePrices", [0, 0])[0] if isinstance(market.get("outcomePrices"), list) else 0.5
                 })
-                
-        return cleaned_events
+            
+            # Use the first market's image or event image
+            image = event.get("image") or event.get("icon") or "https://polymarket.com/images/default-market.png"
+            
+            results.append({
+                "title": title,
+                "image": image,
+                "options": valid_markets
+            })
+            
+        return results
 
     except Exception as e:
         logger.error(f"Search API Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch markets")
+        return []
 
 if __name__ == "__main__":
     import uvicorn

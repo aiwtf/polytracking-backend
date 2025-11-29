@@ -1,0 +1,10 @@
+
+--- Testing /public-search with term 'Elon' ---
+Status: 422
+Error: {"type":"validation error","error":"query argument \"q\": empty"}
+
+
+--- Testing /public-search with term 'tweets' ---
+Status: 422
+Error: {"type":"validation error","error":"query argument \"q\": empty"}
+

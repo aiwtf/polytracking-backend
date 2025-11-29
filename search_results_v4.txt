@@ -1,0 +1,22 @@
+
+--- Testing /public-search with q='Elon' ---
+Status: 200
+Response data type: <class 'dict'>
+Keys: ['events', 'pagination']
+Found 5 events
+1. Will Elon register the America Party by...?
+2. Will Elon Musk rejoin the Trump Administration this year?
+3. Elon no longer world's richest before 2026?
+4. Will Trump meet with Elon Musk again by...?
+5. Elon Musk trillionaire in 2025?
+
+--- Testing /public-search with q='tweets' ---
+Status: 200
+Response data type: <class 'dict'>
+Keys: ['events', 'pagination']
+Found 5 events
+1. Elon Musk # tweets November 21 - November 28, 2025?
+2. Elon Musk # tweets November 25 - December 2, 2025?
+3. Elon Musk # tweets November 28 - December 5, 2025?
+4. Elon Musk musk # tweets in November 2025?
+5. Elon Musk musk # tweets in December 2025?
