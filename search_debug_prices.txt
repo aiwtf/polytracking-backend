@@ -1,0 +1,44 @@
+
+--- Testing /public-search with q='tweets' ---
+
+Event 1: Elon Musk # tweets November 21 - November 28, 2025?
+Markets found: 26
+  Market 1:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1
+  Market 2:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'oneDayPriceChange', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1
+  Market 3:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'oneDayPriceChange', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1
+
+Event 2: Elon Musk # tweets November 25 - December 2, 2025?
+Markets found: 26
+  Market 1:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1
+  Market 2:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'oneDayPriceChange', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1
+  Market 3:
+    Keys: ['id', 'question', 'conditionId', 'slug', 'resolutionSource', 'endDate', 'startDate', 'image', 'icon', 'description', 'outcomes', 'outcomePrices', 'volume', 'active', 'closed', 'marketMakerAddress', 'createdAt', 'updatedAt', 'closedTime', 'new', 'featured', 'submitted_by', 'archived', 'resolvedBy', 'restricted', 'groupItemTitle', 'groupItemThreshold', 'questionID', 'umaEndDate', 'enableOrderBook', 'orderPriceMinTickSize', 'orderMinSize', 'umaResolutionStatus', 'volumeNum', 'endDateIso', 'startDateIso', 'hasReviewedDates', 'volume1wk', 'volume1mo', 'volume1yr', 'clobTokenIds', 'umaBond', 'umaReward', 'volume1wkClob', 'volume1moClob', 'volume1yrClob', 'volumeClob', 'customLiveness', 'acceptingOrders', 'negRisk', 'negRiskMarketID', 'negRiskRequestID', 'ready', 'funded', 'acceptingOrdersTimestamp', 'cyom', 'pagerDutyNotificationEnabled', 'approved', 'rewardsMinSize', 'rewardsMaxSpread', 'spread', 'automaticallyResolved', 'lastTradePrice', 'bestAsk', 'automaticallyActive', 'clearBookOnStart', 'seriesColor', 'showGmpSeries', 'showGmpOutcome', 'manualActivation', 'negRiskOther', 'umaResolutionStatuses', 'pendingDeployment', 'deploying', 'deployingTimestamp', 'rfqEnabled', 'holdingRewardsEnabled', 'feesEnabled']
+    outcomePrices: ["0", "1"]
+    bestBid: None
+    bestAsk: 0.001
+    lastTradePrice: 1

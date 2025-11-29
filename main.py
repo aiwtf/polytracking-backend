@@ -624,10 +624,40 @@ def search_markets(q: str):
             # Extract valid markets
             valid_markets = []
             for market in markets:
+                # Parse outcomePrices if it's a string
+                outcome_prices = market.get("outcomePrices", [])
+                if isinstance(outcome_prices, str):
+                    try:
+                        outcome_prices = json.loads(outcome_prices)
+                    except:
+                        outcome_prices = []
+                
+                # Get the price (assuming binary market, index 0 is usually 'No' or 'Long'? Need to check)
+                # For group markets, usually we want the 'Yes' price which is often index 1?
+                # Or if it's a scalar/categorical, it might be different.
+                # Let's try to get the first valid price, or bestAsk if available.
+                
+                current_price = 0.0
+                if outcome_prices and len(outcome_prices) > 0:
+                    try:
+                        # Polymarket usually returns ["0.12", "0.88"] strings
+                        current_price = float(outcome_prices[0]) # Default to first outcome
+                    except:
+                        pass
+                
+                # Fallback to bestAsk if outcomePrices is weird (like ["0", "1"])
+                if current_price == 0 or current_price == 1:
+                     best_ask = market.get("bestAsk")
+                     if best_ask:
+                         try:
+                             current_price = float(best_ask)
+                         except:
+                             pass
+
                 valid_markets.append({
                     "asset_id": market.get("asset_id"),
                     "name": market.get("groupItemTitle") or market.get("question") or "Outcome",
-                    "current_price": market.get("outcomePrices", [0, 0])[0] if isinstance(market.get("outcomePrices"), list) else 0.5
+                    "current_price": current_price
                 })
             
             # Use the first market's image or event image
