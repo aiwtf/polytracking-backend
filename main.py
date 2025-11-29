@@ -621,9 +621,16 @@ def search_markets(q: str):
             if not markets:
                 continue
             
+            # Filter out closed or resolved events if possible
+            if event.get("closed") is True:
+                continue
+
             # Extract valid markets
             valid_markets = []
             for market in markets:
+                # Skip closed markets
+                if market.get("closed") is True:
+                    continue
                 # Parse outcomePrices if it's a string
                 outcome_prices = market.get("outcomePrices", [])
                 if isinstance(outcome_prices, str):
