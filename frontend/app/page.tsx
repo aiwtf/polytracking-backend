@@ -301,7 +301,7 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await fetch(`${API_URL}/api/subscribe`, {
+      const res = await fetch(`${API_URL}/api/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -312,9 +312,16 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
           ...config
         }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Server returned " + res.status);
+      }
+
       onSuccess();
-    } catch (err) {
-      alert("Failed to track");
+    } catch (err: any) {
+      console.error("Track error:", err);
+      alert(`Failed to track: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -397,12 +404,19 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
   const handleDelete = async (id: number) => {
     if (!confirm("Stop tracking this market?")) return;
     try {
-      await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
+      const res = await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "DELETE",
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Server returned " + res.status);
+      }
+
       onUpdate();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      alert(`Failed to delete: ${err.message}`);
     }
   };
 

@@ -446,9 +446,11 @@ def get_subscriptions(clerk_user_id: str, db: Session = Depends(get_db)):
 
 @app.post("/api/subscribe")
 def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
+    logger.info(f"Received subscription request for user {sub_data.clerk_user_id} asset {sub_data.asset_id}")
     # Find or Create User
     user = db.query(User).filter(User.clerk_user_id == sub_data.clerk_user_id).first()
     if not user:
+        logger.info(f"Creating new user for {sub_data.clerk_user_id}")
         user = User(clerk_user_id=sub_data.clerk_user_id)
         db.add(user)
         db.commit()
@@ -461,6 +463,7 @@ def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
     ).first()
 
     if existing:
+        logger.info(f"Updating existing subscription {existing.id}")
         # Update existing
         existing.title = sub_data.title
         existing.target_outcome = sub_data.target_outcome
@@ -471,6 +474,7 @@ def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
         existing.notify_whale_50k = sub_data.notify_whale_50k
         existing.notify_liquidity = sub_data.notify_liquidity
     else:
+        logger.info("Creating new subscription")
         # Create new
         new_sub = Subscription(
             user_id=user.id,
@@ -512,12 +516,15 @@ def update_subscription(id: int, updates: SubscriptionUpdate, clerk_user_id: str
 
 @app.delete("/api/subscriptions/{id}")
 def delete_subscription(id: int, clerk_user_id: str, db: Session = Depends(get_db)):
+    logger.info(f"Received delete request for sub {id} user {clerk_user_id}")
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     if not user:
+        logger.warning("User not found")
         raise HTTPException(status_code=404, detail="User not found")
 
     sub = db.query(Subscription).filter(Subscription.id == id, Subscription.user_id == user.id).first()
     if not sub:
+        logger.warning("Subscription not found")
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     db.delete(sub)
