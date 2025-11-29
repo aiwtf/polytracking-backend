@@ -53,7 +53,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class User(Base):
-    __tablename__ = "users_v1"
+    __tablename__ = "users_v2"
     id = Column(Integer, primary_key=True, index=True)
     clerk_user_id = Column(String, unique=True, index=True, nullable=False)
     telegram_chat_id = Column(String, nullable=True)
@@ -63,9 +63,9 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
 
 class Subscription(Base):
-    __tablename__ = "subscriptions_v1"
+    __tablename__ = "subscriptions_v2"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users_v1.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users_v2.id'), nullable=False)
     asset_id = Column(String, index=True, nullable=False)
     title = Column(String, nullable=False)
     target_outcome = Column(String, nullable=True)
@@ -94,7 +94,7 @@ def get_db():
 class ConnectTelegramRequest(BaseModel):
     clerk_user_id: str
 
-class MarketCreate(BaseModel):
+class SubscriptionCreate(BaseModel):
     clerk_user_id: str
     asset_id: str
     title: str
@@ -106,7 +106,16 @@ class MarketCreate(BaseModel):
     notify_whale_50k: Optional[bool] = False
     notify_liquidity: Optional[bool] = False
 
-class MarketResponse(BaseModel):
+class SubscriptionUpdate(BaseModel):
+    notify_0_5pct: Optional[bool] = None
+    notify_2pct: Optional[bool] = None
+    notify_5pct: Optional[bool] = None
+    notify_whale_10k: Optional[bool] = None
+    notify_whale_50k: Optional[bool] = None
+    notify_liquidity: Optional[bool] = None
+
+class SubscriptionResponse(BaseModel):
+    id: int
     asset_id: str
     title: str
     target_outcome: Optional[str]
@@ -123,38 +132,24 @@ class MarketResponse(BaseModel):
 # --- Monitor Logic ---
 class MarketMonitor:
     def __init__(self):
-        self.markets = {} # asset_id -> { "title": ..., "subscribers": [user_id, ...] } (Simplified for now)
-        self.last_prices = {} # asset_id -> price
+        self.markets = {} 
+        self.last_prices = {} 
         self.host = "https://clob.polymarket.com"
-        self.chain_id = 137 # Polygon
+        self.chain_id = 137 
         self.client = ClobClient(host=self.host, key="", chain_id=self.chain_id) 
         self.ws_connection = None
         self.should_reconnect = False
         self.running = False
+        self.db_session = SessionLocal()
 
     def load_markets(self):
-        """
-        Loads all unique asset_ids from Subscription table.
-        Returns a dict: { asset_id: { 'title': title } }
-        For MVP, we just need the list of assets to watch.
-        """
         db = SessionLocal()
         try:
-            # Query all subscriptions
-            subs = db.query(Subscription).all()
-            
-            # Aggregate unique assets
-            market_map = {}
-            for sub in subs:
-                if sub.asset_id not in market_map:
-                    market_map[sub.asset_id] = {
-                        "title": sub.title,
-                        # We could store a list of interested users here for targeted alerts later
-                        "subscribers": [] 
-                    }
-                market_map[sub.asset_id]["subscribers"].append(sub.user_id)
-            
-            return market_map
+            # Query all unique asset_ids
+            asset_ids = db.query(Subscription.asset_id).distinct().all()
+            # We also need to know which users to notify, but for MVP we check DB in check_volatility
+            # So here we just return the keys to subscribe to.
+            return {row[0]: {} for row in asset_ids}
         finally:
             db.close()
 
@@ -168,7 +163,8 @@ class MarketMonitor:
         payload = {
             "chat_id": target_chat_id,
             "text": message,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
         }
         # Only use thread_id if sending to the main channel
         if target_chat_id == TELEGRAM_CHAT_ID:
@@ -180,6 +176,14 @@ class MarketMonitor:
             logger.info(f"Telegram alert sent successfully to {target_chat_id}.")
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")
+
+    def trigger_reload(self):
+        """Manually trigger a reload of markets (called by API)"""
+        logger.info("Manual reload triggered via API.")
+        self.markets = self.load_markets()
+        self.should_reconnect = True
+        if self.ws_connection and not self.ws_connection.closed:
+            pass
 
     async def refresh_subscriptions_loop(self):
         while self.running:
@@ -194,23 +198,12 @@ class MarketMonitor:
                 if self.ws_connection:
                     await self.ws_connection.close()
             else:
-                # Update settings even if keys didn't change
                 self.markets = new_markets
-
-    def trigger_reload(self):
-        """Manually trigger a reload of markets (called by API)"""
-        logger.info("Manual reload triggered via API.")
-        self.markets = self.load_markets()
-        self.should_reconnect = True
-        if self.ws_connection and not self.ws_connection.closed:
-            pass
 
     async def start(self):
         self.running = True
         self.markets = self.load_markets()
         logger.info(f"Starting Monitor. Watching {len(self.markets)} markets.")
-        
-        # self.send_telegram_alert(f"🤖 **Monitor Started**\nWatching {len(self.markets)} markets.")
         
         asyncio.create_task(self.refresh_subscriptions_loop())
         
@@ -249,10 +242,6 @@ class MarketMonitor:
                             message = await websocket.recv()
                             if not message:
                                 continue
-                            
-                            # [DEBUG] Log raw message to see what we are getting
-                            # if len(message) < 1000:
-                            #     logger.info(f"RAW MSG: {message}")
                             
                             try:
                                 data = json.loads(message)
@@ -304,7 +293,7 @@ class MarketMonitor:
                 continue
             
             if asset_id in self.markets:
-                logger.info(f"👁️ Seen trade | Price: {price:.4f} | Size: ${size*price:.2f}")
+                # logger.info(f"👁️ Seen trade | Price: {price:.4f} | Size: ${size*price:.2f}")
                 self.check_whale(asset_id, size, price)
                 self.check_volatility(asset_id, price)
 
@@ -318,73 +307,79 @@ class MarketMonitor:
         change_pct = (new_price - last_price) / last_price
         abs_change = abs(change_pct)
         
-        settings = self.markets.get(asset_id, {})
-        title = settings.get("title", "Unknown Event")
+        # Determine Alert Level
+        alert_level = None
+        if abs_change >= 0.05: alert_level = "5pct"
+        elif abs_change >= 0.02: alert_level = "2pct"
+        elif abs_change >= 0.005: alert_level = "0_5pct"
         
-        # NOTE: For MVP, we are broadcasting to the main channel based on global thresholds.
-        # In a full SaaS, we would iterate through `settings['subscribers']`, check their individual thresholds,
-        # and send private messages to their `telegram_chat_id`.
-        
-        should_alert = False
-        alert_emoji = ""
-        threshold_text = ""
+        if alert_level:
+            db = SessionLocal()
+            try:
+                # Find subscribers for this asset
+                subs = db.query(Subscription).filter(Subscription.asset_id == asset_id).all()
+                
+                for sub in subs:
+                    # Check if user wants this alert
+                    should_notify = False
+                    if alert_level == "5pct" and sub.notify_5pct: should_notify = True
+                    elif alert_level == "2pct" and sub.notify_2pct: should_notify = True
+                    elif alert_level == "0_5pct" and sub.notify_0_5pct: should_notify = True
+                    
+                    # Fallback: Higher thresholds imply lower ones (optional, but good UX)
+                    if not should_notify:
+                         if alert_level == "5pct" and (sub.notify_2pct or sub.notify_0_5pct): should_notify = True
+                         elif alert_level == "2pct" and sub.notify_0_5pct: should_notify = True
 
-        # Simplified Logic for MVP: Alert if > 1% change (can be refined to check DB flags)
-        if abs_change >= 0.10:
-            should_alert = True
-            alert_emoji = "🔥" 
-            threshold_text = ">10%"
-        elif abs_change >= 0.05:
-            should_alert = True
-            alert_emoji = "⚡" 
-            threshold_text = ">5%"
-        elif abs_change >= 0.02: # Changed from 1% to 2% as per new requirements
-            should_alert = True
-            alert_emoji = "🌊" 
-            threshold_text = ">2%"
-        elif abs_change >= 0.005: # 0.5%
-             should_alert = True
-             alert_emoji = "💧"
-             threshold_text = ">0.5%"
+                    if should_notify and sub.user.telegram_chat_id:
+                        direction_emoji = "📈" if change_pct > 0 else "📉"
+                        trend_text = "SURGE" if change_pct > 0 else "DUMP"
+                        link = f"https://polymarket.com/event/{sub.title.replace(' ', '-').lower()}" # Approximate link
 
-        if should_alert:
-            direction_emoji = "" if change_pct > 0 else ""
-            trend_text = "SURGE" if change_pct > 0 else "DUMP"
-            link = f"https://polymarket.com/"
-
-            msg = (
-                f"{alert_emoji} **{trend_text} ALERT** ({threshold_text})\n\n"
-                f"🔮 **Event**: {title}\n"
-                f"{direction_emoji} **Move**: {last_price:.3f} ➔ {new_price:.3f} ({change_pct*100:+.1f}%)\n"
-                f"📊 **Price**: ${new_price:.3f}\n\n"
-                f"[View on Polymarket ↗]({link})"
-            )
-            
-            logger.warning(msg)
-            self.send_telegram_alert(msg)
+                        msg = (
+                            f"{direction_emoji} **{trend_text} ALERT** ({abs_change*100:.1f}%)\n\n"
+                            f"🔮 **Event**: {sub.title}\n"
+                            f"🎯 **Outcome**: {sub.target_outcome}\n"
+                            f"💰 **Price**: {last_price:.3f} ➔ {new_price:.3f}\n\n"
+                            f"[View Market]({link})"
+                        )
+                        self.send_telegram_alert(msg, chat_id=sub.user.telegram_chat_id)
+            finally:
+                db.close()
             
         self.last_prices[asset_id] = new_price
 
     def check_whale(self, asset_id, size, price):
         volume_usdc = size * price
         
-        # Simplified Whale Logic
-        if volume_usdc >= 10000: # 10k threshold
-            settings = self.markets.get(asset_id, {})
-            title = settings.get("title", "Unknown Event")
-            
-            emoji = "🐋" if volume_usdc >= 50000 else "🐟"
-            
-            msg = (
-                f"{emoji} **巨鯨警報** {emoji}\n"
-                f"事件：{title}\n"
-                f"金額：{volume_usdc:,.2f} USDC\n"
-                f"價格：{price:.2f}\n"
-                f"原因：檢測到巨額買入\n"
-                f"ID: `{asset_id[:10]}...`"
-            )
-            logger.warning(msg)
-            self.send_telegram_alert(msg)
+        whale_level = None
+        if volume_usdc >= 50000: whale_level = "50k"
+        elif volume_usdc >= 10000: whale_level = "10k"
+        
+        if whale_level:
+            db = SessionLocal()
+            try:
+                subs = db.query(Subscription).filter(Subscription.asset_id == asset_id).all()
+                for sub in subs:
+                    should_notify = False
+                    if whale_level == "50k" and sub.notify_whale_50k: should_notify = True
+                    elif whale_level == "10k" and sub.notify_whale_10k: should_notify = True
+                    
+                    # 50k implies 10k interest usually
+                    if whale_level == "50k" and sub.notify_whale_10k: should_notify = True
+
+                    if should_notify and sub.user.telegram_chat_id:
+                        emoji = "🐋" if whale_level == "50k" else "🐟"
+                        msg = (
+                            f"{emoji} **WHALE ALERT** {emoji}\n\n"
+                            f"🔮 **Event**: {sub.title}\n"
+                            f"🎯 **Outcome**: {sub.target_outcome}\n"
+                            f"💵 **Amount**: ${volume_usdc:,.0f}\n"
+                            f"📊 **Price**: {price:.3f}"
+                        )
+                        self.send_telegram_alert(msg, chat_id=sub.user.telegram_chat_id)
+            finally:
+                db.close()
 
 # --- FastAPI App ---
 monitor = MarketMonitor()
@@ -429,8 +424,19 @@ def connect_telegram(req: ConnectTelegramRequest, db: Session = Depends(get_db))
     
     return {"status": "success", "connection_token": token}
 
-@app.get("/api/markets", response_model=List[MarketResponse])
-def get_markets(clerk_user_id: str, db: Session = Depends(get_db)):
+@app.get("/api/user/status")
+def get_user_status(clerk_user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
+    if not user:
+        return {"telegram_connected": False, "chat_id": None}
+    
+    return {
+        "telegram_connected": bool(user.telegram_chat_id),
+        "chat_id": user.telegram_chat_id
+    }
+
+@app.get("/api/subscriptions", response_model=List[SubscriptionResponse])
+def get_subscriptions(clerk_user_id: str, db: Session = Depends(get_db)):
     # Find user
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     if not user:
@@ -438,12 +444,12 @@ def get_markets(clerk_user_id: str, db: Session = Depends(get_db)):
     
     return user.subscriptions
 
-@app.post("/api/markets")
-def add_market(market: MarketCreate, db: Session = Depends(get_db)):
+@app.post("/api/subscribe")
+def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
     # Find or Create User
-    user = db.query(User).filter(User.clerk_user_id == market.clerk_user_id).first()
+    user = db.query(User).filter(User.clerk_user_id == sub_data.clerk_user_id).first()
     if not user:
-        user = User(clerk_user_id=market.clerk_user_id)
+        user = User(clerk_user_id=sub_data.clerk_user_id)
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -451,30 +457,32 @@ def add_market(market: MarketCreate, db: Session = Depends(get_db)):
     # Check if subscription exists
     existing = db.query(Subscription).filter(
         Subscription.user_id == user.id,
-        Subscription.asset_id == market.asset_id
+        Subscription.asset_id == sub_data.asset_id
     ).first()
 
     if existing:
-        existing.title = market.title
-        existing.target_outcome = market.target_outcome
-        existing.notify_0_5pct = market.notify_0_5pct
-        existing.notify_2pct = market.notify_2pct
-        existing.notify_5pct = market.notify_5pct
-        existing.notify_whale_10k = market.notify_whale_10k
-        existing.notify_whale_50k = market.notify_whale_50k
-        existing.notify_liquidity = market.notify_liquidity
+        # Update existing
+        existing.title = sub_data.title
+        existing.target_outcome = sub_data.target_outcome
+        existing.notify_0_5pct = sub_data.notify_0_5pct
+        existing.notify_2pct = sub_data.notify_2pct
+        existing.notify_5pct = sub_data.notify_5pct
+        existing.notify_whale_10k = sub_data.notify_whale_10k
+        existing.notify_whale_50k = sub_data.notify_whale_50k
+        existing.notify_liquidity = sub_data.notify_liquidity
     else:
+        # Create new
         new_sub = Subscription(
             user_id=user.id,
-            asset_id=market.asset_id, 
-            title=market.title,
-            target_outcome=market.target_outcome,
-            notify_0_5pct=market.notify_0_5pct,
-            notify_2pct=market.notify_2pct,
-            notify_5pct=market.notify_5pct,
-            notify_whale_10k=market.notify_whale_10k,
-            notify_whale_50k=market.notify_whale_50k,
-            notify_liquidity=market.notify_liquidity
+            asset_id=sub_data.asset_id, 
+            title=sub_data.title,
+            target_outcome=sub_data.target_outcome,
+            notify_0_5pct=sub_data.notify_0_5pct,
+            notify_2pct=sub_data.notify_2pct,
+            notify_5pct=sub_data.notify_5pct,
+            notify_whale_10k=sub_data.notify_whale_10k,
+            notify_whale_50k=sub_data.notify_whale_50k,
+            notify_liquidity=sub_data.notify_liquidity
         )
         db.add(new_sub)
     
@@ -482,17 +490,33 @@ def add_market(market: MarketCreate, db: Session = Depends(get_db)):
     monitor.trigger_reload()
     return {"status": "success", "message": "Subscription added/updated"}
 
-@app.delete("/api/markets/{asset_id}")
-def delete_market(asset_id: str, clerk_user_id: str, db: Session = Depends(get_db)):
+@app.patch("/api/subscriptions/{id}")
+def update_subscription(id: int, updates: SubscriptionUpdate, clerk_user_id: str, db: Session = Depends(get_db)):
+    # Verify user owns this subscription
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    sub = db.query(Subscription).filter(
-        Subscription.user_id == user.id,
-        Subscription.asset_id == asset_id
-    ).first()
+    sub = db.query(Subscription).filter(Subscription.id == id, Subscription.user_id == user.id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Apply updates
+    update_data = updates.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(sub, key, value)
     
+    db.commit()
+    monitor.trigger_reload()
+    return {"status": "success", "message": "Subscription updated"}
+
+@app.delete("/api/subscriptions/{id}")
+def delete_subscription(id: int, clerk_user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub = db.query(Subscription).filter(Subscription.id == id, Subscription.user_id == user.id).first()
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
     
@@ -500,6 +524,9 @@ def delete_market(asset_id: str, clerk_user_id: str, db: Session = Depends(get_d
     db.commit()
     monitor.trigger_reload()
     return {"status": "success", "message": "Subscription deleted"}
+
+# Keep legacy endpoints for compatibility during migration if needed, or redirect them
+# For now, we assume frontend will be updated to use new endpoints.
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
@@ -533,7 +560,7 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
                 db.commit()
                 
                 monitor.send_telegram_alert(
-                    "✅ 綁定成功！您現在可以在網頁上訂閱市場了。",
+                    "✅ 綁定成功！您已可接收客製化通知。\n\n💬 加入官方討論群：https://t.me/Polytracking/4",
                     chat_id=chat_id
                 )
             else:
