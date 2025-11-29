@@ -69,6 +69,7 @@ class Subscription(Base):
     asset_id = Column(String, index=True, nullable=False)
     title = Column(String, nullable=False)
     target_outcome = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
     
     # Thresholds
     notify_0_5pct = Column(Boolean, default=False) # >0.5%
@@ -99,6 +100,7 @@ class SubscriptionCreate(BaseModel):
     asset_id: str
     title: str
     target_outcome: Optional[str] = "Yes"
+    image_url: Optional[str] = None
     notify_0_5pct: Optional[bool] = False
     notify_2pct: Optional[bool] = False
     notify_5pct: Optional[bool] = False
@@ -119,6 +121,7 @@ class SubscriptionResponse(BaseModel):
     asset_id: str
     title: str
     target_outcome: Optional[str]
+    image_url: Optional[str]
     notify_0_5pct: bool
     notify_2pct: bool
     notify_5pct: bool
@@ -481,6 +484,7 @@ def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
             asset_id=sub_data.asset_id, 
             title=sub_data.title,
             target_outcome=sub_data.target_outcome,
+            image_url=sub_data.image_url,
             notify_0_5pct=sub_data.notify_0_5pct,
             notify_2pct=sub_data.notify_2pct,
             notify_5pct=sub_data.notify_5pct,
@@ -692,6 +696,37 @@ def search_markets(q: str):
     except Exception as e:
         logger.error(f"Search API Error: {e}")
         return []
+
+class TestNotificationRequest(BaseModel):
+    subscription_id: int
+    clerk_user_id: str
+
+@app.post("/api/debug/test-notification")
+def test_notification(req: TestNotificationRequest, db: Session = Depends(get_db)):
+    # Verify user
+    user = db.query(User).filter(User.clerk_user_id == req.clerk_user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Verify subscription
+    sub = db.query(Subscription).filter(Subscription.id == req.subscription_id, Subscription.user_id == user.id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not user.telegram_chat_id:
+        raise HTTPException(status_code=400, detail="Telegram not connected")
+
+    # Send test message
+    msg = (
+        f"🧪 **TEST NOTIFICATION** 🧪\n\n"
+        f"This is a test alert for:\n"
+        f"🔮 **{sub.title}**\n"
+        f"🎯 **{sub.target_outcome}**\n\n"
+        f"If you see this, your Telegram alerts are working perfectly! ✅"
+    )
+    
+    monitor.send_telegram_alert(msg, chat_id=user.telegram_chat_id)
+    return {"status": "success", "message": "Test notification sent"}
 
 if __name__ == "__main__":
     import uvicorn

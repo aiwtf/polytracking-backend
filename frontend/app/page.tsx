@@ -38,6 +38,7 @@ interface Subscription {
   asset_id: string;
   title: string;
   target_outcome: string;
+  image_url?: string;
   notify_0_5pct: boolean;
   notify_2pct: boolean;
   notify_5pct: boolean;
@@ -412,25 +413,70 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
   const handleToggle = async (id: number, field: keyof TrackingConfig, value: boolean) => {
     if (!userId) return;
 
-    // 1. Optimistic Update: Update UI immediately
-    setOptimisticSubs(prev => prev.map(sub =>
-      sub.id === id ? { ...sub, [field]: value } : sub
-    ));
+    // 1. Optimistic Update with Mutual Exclusivity Logic
+    setOptimisticSubs(prev => prev.map(sub => {
+      if (sub.id !== id) return sub;
+
+      const newSub = { ...sub, [field]: value };
+
+      // Enforce mutual exclusivity for percentages
+      if (value === true) {
+        if (field === 'notify_0_5pct') {
+          newSub.notify_2pct = false;
+          newSub.notify_5pct = false;
+        } else if (field === 'notify_2pct') {
+          newSub.notify_0_5pct = false;
+          newSub.notify_5pct = false;
+        } else if (field === 'notify_5pct') {
+          newSub.notify_0_5pct = false;
+          newSub.notify_2pct = false;
+        }
+
+        // Enforce mutual exclusivity for whales
+        if (field === 'notify_whale_10k') {
+          newSub.notify_whale_50k = false;
+        } else if (field === 'notify_whale_50k') {
+          newSub.notify_whale_10k = false;
+        }
+      }
+
+      return newSub;
+    }));
 
     try {
-      // 2. Call API in background
+      // 2. Call API in background (we send the single update, backend handles it? 
+      // Actually, if we want to turn others OFF, we might need to send multiple updates or a full update.
+      // The current PATCH endpoint updates specific fields. 
+      // To ensure consistency, we should probably send the full state or multiple patches.
+      // But for simplicity/speed, let's just send the one we clicked, 
+      // AND if we turned others off, we need to send those too.
+      // Ideally, the backend should handle this logic, but user asked for frontend logic change.
+      // Let's send a PATCH with ALL relevant fields to be safe.
+
+      const subToUpdate = optimisticSubs.find(s => s.id === id);
+      if (!subToUpdate) return;
+
+      // Calculate the new state again (same logic as above)
+      const updates: any = { [field]: value };
+      if (value === true) {
+        if (field === 'notify_0_5pct') { updates.notify_2pct = false; updates.notify_5pct = false; }
+        if (field === 'notify_2pct') { updates.notify_0_5pct = false; updates.notify_5pct = false; }
+        if (field === 'notify_5pct') { updates.notify_0_5pct = false; updates.notify_2pct = false; }
+        if (field === 'notify_whale_10k') { updates.notify_whale_50k = false; }
+        if (field === 'notify_whale_50k') { updates.notify_whale_10k = false; }
+      }
+
       await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value }),
+        body: JSON.stringify(updates),
       });
-      // 3. Sync with server (optional, but good for consistency)
+
       onUpdate();
     } catch (err) {
       console.error(err);
-      // Revert on error (optional, could add toast here)
       setOptimisticSubs(subscriptions);
-      alert("Failed to update setting. Please try again.");
+      alert("Failed to update setting.");
     }
   };
 
@@ -490,19 +536,35 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
 
       <div className="grid gap-4">
         {optimisticSubs.map((sub) => (
-          <div key={sub.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div key={sub.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
 
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">
-                  {sub.target_outcome}
-                </span>
-                <span className="text-xs text-gray-400 font-mono">{sub.asset_id.slice(0, 8)}...</span>
+            <div className="flex items-center gap-4 flex-1">
+              {/* Image Icon */}
+              <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+                {sub.image_url ? (
+                  <img src={sub.image_url} alt="icon" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <Activity size={20} />
+                  </div>
+                )}
               </div>
-              <h3 className="font-semibold text-gray-900 leading-tight">{sub.title}</h3>
+
+              <div className="min-w-0">
+                {/* Title only, no badge, no asset ID */}
+                <h3 className="font-semibold text-gray-900 leading-tight text-sm md:text-base line-clamp-2">
+                  {sub.title}
+                </h3>
+                {/* Optional: Show target outcome if it's short, e.g. "Yes" */}
+                {['Yes', 'No'].includes(sub.target_outcome) && (
+                  <span className="text-xs text-gray-500 font-medium mt-0.5 block">
+                    Outcome: {sub.target_outcome}
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
               <Toggle label="0.5%" active={sub.notify_0_5pct} onClick={() => handleToggle(sub.id, 'notify_0_5pct', !sub.notify_0_5pct)} />
               <Toggle label="2%" active={sub.notify_2pct} onClick={() => handleToggle(sub.id, 'notify_2pct', !sub.notify_2pct)} />
               <Toggle label="5%" active={sub.notify_5pct} onClick={() => handleToggle(sub.id, 'notify_5pct', !sub.notify_5pct)} />
@@ -510,6 +572,7 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
               <Toggle icon={<Fish size={14} />} label="10k" active={sub.notify_whale_10k} onClick={() => handleToggle(sub.id, 'notify_whale_10k', !sub.notify_whale_10k)} />
               <Toggle icon={<Anchor size={14} />} label="50k" active={sub.notify_whale_50k} onClick={() => handleToggle(sub.id, 'notify_whale_50k', !sub.notify_whale_50k)} />
             </div>
+
 
             <div className="flex items-center gap-2 self-end md:self-center">
               <button
