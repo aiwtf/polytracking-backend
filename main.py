@@ -44,7 +44,6 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@Polytracking")
 TELEGRAM_THREAD_ID = int(os.getenv("TELEGRAM_THREAD_ID", "4"))
 
 # Thresholds
-VOLATILITY_THRESHOLD = 0.02
 WHALE_THRESHOLD_USDC = 50000
 
 # --- Database Setup ---
@@ -58,6 +57,10 @@ class WatchedMarket(Base):
     asset_id = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    # Granular Notification Settings
+    notify_1pct = Column(Boolean, default=False)
+    notify_5pct = Column(Boolean, default=False)
+    notify_10pct = Column(Boolean, default=False)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -73,11 +76,24 @@ def get_db():
 class MarketCreate(BaseModel):
     asset_id: str
     title: str
+    notify_1pct: Optional[bool] = False
+    notify_5pct: Optional[bool] = False
+    notify_10pct: Optional[bool] = False
+
+class MarketUpdate(BaseModel):
+    title: Optional[str] = None
+    is_active: Optional[bool] = None
+    notify_1pct: Optional[bool] = None
+    notify_5pct: Optional[bool] = None
+    notify_10pct: Optional[bool] = None
 
 class MarketResponse(BaseModel):
     asset_id: str
     title: str
     is_active: bool
+    notify_1pct: bool
+    notify_5pct: bool
+    notify_10pct: bool
 
     class Config:
         orm_mode = True
@@ -85,7 +101,7 @@ class MarketResponse(BaseModel):
 # --- Monitor Logic ---
 class MarketMonitor:
     def __init__(self):
-        self.markets = {} # asset_id -> title
+        self.markets = {} # asset_id -> dict of settings
         self.last_prices = {} # asset_id -> price
         self.host = "https://clob.polymarket.com"
         self.chain_id = 137 # Polygon
@@ -98,7 +114,15 @@ class MarketMonitor:
         db = SessionLocal()
         try:
             markets = db.query(WatchedMarket).filter(WatchedMarket.is_active == True).all()
-            return {m.asset_id: m.title for m in markets}
+            return {
+                m.asset_id: {
+                    "title": m.title,
+                    "notify_1pct": m.notify_1pct,
+                    "notify_5pct": m.notify_5pct,
+                    "notify_10pct": m.notify_10pct
+                } 
+                for m in markets
+            }
         finally:
             db.close()
 
@@ -133,23 +157,16 @@ class MarketMonitor:
                 self.should_reconnect = True
                 if self.ws_connection:
                     await self.ws_connection.close()
+            else:
+                # Update settings even if keys didn't change
+                self.markets = new_markets
 
     def trigger_reload(self):
         """Manually trigger a reload of markets (called by API)"""
         logger.info("Manual reload triggered via API.")
         self.markets = self.load_markets()
         self.should_reconnect = True
-        # We can't easily close the WS from here if it's in a different loop context, 
-        # but setting should_reconnect might be enough if the loop checks it, 
-        # or we rely on the next message/timeout to catch it. 
-        # Ideally, we'd signal the loop. For MVP, we'll let the 60s loop or next error handle it,
-        # or we can try to close if we have access to the object.
-        # Since this runs in the same process, we can try:
         if self.ws_connection and not self.ws_connection.closed:
-            # Scheduling the close in the loop would be better, but let's just set the flag 
-            # and wait for the refresh loop or the main loop to pick it up.
-            # To make it instant, we really need to cancel the WS task or close the socket.
-            # We'll leave it to the refresh loop for safety or implement a proper signal later.
             pass
 
     async def start(self):
@@ -266,24 +283,44 @@ class MarketMonitor:
         if new_price <= 0: return
 
         change_pct = (new_price - last_price) / last_price
-        if abs(change_pct) >= VOLATILITY_THRESHOLD:
+        abs_change = abs(change_pct)
+        
+        settings = self.markets.get(asset_id, {})
+        title = settings.get("title", "Unknown Event")
+        
+        should_alert = False
+        threshold_label = ""
+
+        # Check thresholds (highest priority first)
+        if abs_change >= 0.10 and settings.get("notify_10pct"):
+            should_alert = True
+            threshold_label = "(>10%)"
+        elif abs_change >= 0.05 and settings.get("notify_5pct"):
+            should_alert = True
+            threshold_label = "(>5%)"
+        elif abs_change >= 0.01 and settings.get("notify_1pct"):
+            should_alert = True
+            threshold_label = "(>1%)"
+
+        if should_alert:
             direction = "🔺" if change_pct > 0 else "🔻"
-            title = self.markets.get(asset_id, "Unknown Event")
             msg = (
-                f"🚨 **波動警報** 🚨\n"
+                f"🚨 **波動警報 {threshold_label}** 🚨\n"
                 f"事件：{title}\n"
                 f"變化：{last_price:.2f} ➔ {new_price:.2f} {direction} ({change_pct*100:.1f}%)\n"
-                f"原因：賠率突變\n"
+                f"原因：價格劇烈波動\n"
                 f"ID: `{asset_id[:10]}...`"
             )
             logger.warning(msg)
             self.send_telegram_alert(msg)
+            
         self.last_prices[asset_id] = new_price
 
     def check_whale(self, asset_id, size, price):
         volume_usdc = size * price
         if volume_usdc >= WHALE_THRESHOLD_USDC:
-            title = self.markets.get(asset_id, "Unknown Event")
+            settings = self.markets.get(asset_id, {})
+            title = settings.get("title", "Unknown Event")
             msg = (
                 f"🚨 **巨鯨警報** 🚨\n"
                 f"事件：{title}\n"
@@ -324,10 +361,10 @@ app.add_middleware(
 def read_root():
     return {"status": "ok", "monitor_running": monitor.running}
 
-@app.get("/api/markets")
+@app.get("/api/markets", response_model=List[MarketResponse])
 def get_markets(db: Session = Depends(get_db)):
     markets = db.query(WatchedMarket).all()
-    return [{"asset_id": m.asset_id, "title": m.title, "is_active": m.is_active} for m in markets]
+    return markets
 
 @app.post("/api/markets")
 def add_market(market: MarketCreate, db: Session = Depends(get_db)):
@@ -335,13 +372,40 @@ def add_market(market: MarketCreate, db: Session = Depends(get_db)):
     if existing:
         existing.title = market.title
         existing.is_active = True
+        # Update settings if provided (or keep existing? User request implies update)
+        # For POST, usually we overwrite or set defaults. 
+        # Let's update them to match the input.
+        existing.notify_1pct = market.notify_1pct
+        existing.notify_5pct = market.notify_5pct
+        existing.notify_10pct = market.notify_10pct
     else:
-        new_market = WatchedMarket(asset_id=market.asset_id, title=market.title, is_active=True)
+        new_market = WatchedMarket(
+            asset_id=market.asset_id, 
+            title=market.title, 
+            is_active=True,
+            notify_1pct=market.notify_1pct,
+            notify_5pct=market.notify_5pct,
+            notify_10pct=market.notify_10pct
+        )
         db.add(new_market)
     
     db.commit()
     monitor.trigger_reload()
     return {"status": "success", "message": "Market added/updated"}
+
+@app.patch("/api/markets/{asset_id}")
+def update_market(asset_id: str, market_update: MarketUpdate, db: Session = Depends(get_db)):
+    market = db.query(WatchedMarket).filter(WatchedMarket.asset_id == asset_id).first()
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    
+    update_data = market_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(market, key, value)
+    
+    db.commit()
+    monitor.trigger_reload()
+    return {"status": "success", "message": "Market updated"}
 
 @app.delete("/api/markets/{asset_id}")
 def delete_market(asset_id: str, db: Session = Depends(get_db)):
