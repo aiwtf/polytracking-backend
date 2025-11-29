@@ -52,7 +52,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class WatchedMarket(Base):
-    __tablename__ = "watched_markets"
+    __tablename__ = "watched_markets_v2"
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, nullable=False)
@@ -289,28 +289,39 @@ class MarketMonitor:
         title = settings.get("title", "Unknown Event")
         
         should_alert = False
-        threshold_label = ""
+        alert_emoji = ""
+        threshold_text = ""
 
-        # Check thresholds (highest priority first)
+        # Logic: Pick the highest priority alert
         if abs_change >= 0.10 and settings.get("notify_10pct"):
             should_alert = True
-            threshold_label = "(>10%)"
+            alert_emoji = "🔥" # Fire for huge moves
+            threshold_text = ">10%"
         elif abs_change >= 0.05 and settings.get("notify_5pct"):
             should_alert = True
-            threshold_label = "(>5%)"
+            alert_emoji = "⚡" # Lightning for big moves
+            threshold_text = ">5%"
         elif abs_change >= 0.01 and settings.get("notify_1pct"):
             should_alert = True
-            threshold_label = "(>1%)"
+            alert_emoji = "🌊" # Wave for small moves
+            threshold_text = ">1%"
 
         if should_alert:
-            direction = "🔺" if change_pct > 0 else "🔻"
+            direction_emoji = "�" if change_pct > 0 else "�"
+            trend_text = "SURGE" if change_pct > 0 else "DUMP"
+            
+            # 建立 Polymarket 連結 (如果有 slug 最好，沒有則連首頁或用 ID 搜尋)
+            # 這裡我們用搜尋連結作為替代方案，因為沒有存 slug
+            link = f"https://polymarket.com/"
+
             msg = (
-                f"🚨 **波動警報 {threshold_label}** 🚨\n"
-                f"事件：{title}\n"
-                f"變化：{last_price:.2f} ➔ {new_price:.2f} {direction} ({change_pct*100:.1f}%)\n"
-                f"原因：價格劇烈波動\n"
-                f"ID: `{asset_id[:10]}...`"
+                f"{alert_emoji} **{trend_text} ALERT** ({threshold_text})\n\n"
+                f"🔮 **Event**: {title}\n"
+                f"{direction_emoji} **Move**: {last_price:.3f} ➔ {new_price:.3f} ({change_pct*100:+.1f}%)\n"
+                f"📊 **Price**: ${new_price:.3f}\n\n"
+                f"[View on Polymarket ↗]({link})"
             )
+            
             logger.warning(msg)
             self.send_telegram_alert(msg)
             
