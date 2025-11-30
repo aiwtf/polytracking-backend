@@ -536,12 +536,19 @@ def delete_subscription(id: int, clerk_user_id: str, db: Session = Depends(get_d
     logger.info(f"Received delete request for sub {id} user {clerk_user_id}")
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     if not user:
-        logger.warning("User not found")
+        logger.warning(f"User not found for clerk_id: {clerk_user_id}")
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Debug: Check if sub exists at all
+    sub_check = db.query(Subscription).filter(Subscription.id == id).first()
+    if sub_check:
+        logger.info(f"Debug: Sub {id} exists. Owner: {sub_check.user_id}. Requesting User: {user.id}")
+    else:
+        logger.info(f"Debug: Sub {id} does NOT exist in DB.")
 
     sub = db.query(Subscription).filter(Subscription.id == id, Subscription.user_id == user.id).first()
     if not sub:
-        logger.warning("Subscription not found")
+        logger.warning(f"Subscription {id} not found for user {user.id}")
         raise HTTPException(status_code=404, detail="Subscription not found")
     
     db.delete(sub)
