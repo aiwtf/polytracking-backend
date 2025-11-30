@@ -522,6 +522,8 @@ def update_subscription(id: int, updates: SubscriptionUpdate, clerk_user_id: str
 
     # Apply updates
     update_data = updates.dict(exclude_unset=True)
+    logger.info(f"Updating sub {id} with: {update_data}")
+    
     for key, value in update_data.items():
         setattr(sub, key, value)
     

@@ -425,13 +425,18 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
     if (!userId) return;
 
     // 1. Optimistic Update with Mutual Exclusivity Logic
+    // Logic:
+    // - Percentage (0.5%, 2%, 5%) are mutually exclusive.
+    // - Whale (10k, 50k) are mutually exclusive.
+    // - Percentage and Whale are independent (can have one of each).
+
     setOptimisticSubs(prev => prev.map(sub => {
       if (sub.id !== id) return sub;
 
       const newSub = { ...sub, [field]: value };
 
-      // Enforce mutual exclusivity for percentages
       if (value === true) {
+        // If enabling a percentage option, disable other percentage options
         if (field === 'notify_0_5pct') {
           newSub.notify_2pct = false;
           newSub.notify_5pct = false;
@@ -443,7 +448,7 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
           newSub.notify_2pct = false;
         }
 
-        // Enforce mutual exclusivity for whales
+        // If enabling a whale option, disable other whale options
         if (field === 'notify_whale_10k') {
           newSub.notify_whale_50k = false;
         } else if (field === 'notify_whale_50k') {
@@ -455,27 +460,20 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
     }));
 
     try {
-      // 2. Call API in background (we send the single update, backend handles it? 
-      // Actually, if we want to turn others OFF, we might need to send multiple updates or a full update.
-      // The current PATCH endpoint updates specific fields. 
-      // To ensure consistency, we should probably send the full state or multiple patches.
-      // But for simplicity/speed, let's just send the one we clicked, 
-      // AND if we turned others off, we need to send those too.
-      // Ideally, the backend should handle this logic, but user asked for frontend logic change.
-      // Let's send a PATCH with ALL relevant fields to be safe.
-
-      const subToUpdate = optimisticSubs.find(s => s.id === id);
-      if (!subToUpdate) return;
-
-      // Calculate the new state again (same logic as above)
+      // 2. Prepare Payload for Backend
       const updates: any = { [field]: value };
+
       if (value === true) {
+        // Explicitly send false for mutually exclusive fields to ensure backend sync
         if (field === 'notify_0_5pct') { updates.notify_2pct = false; updates.notify_5pct = false; }
         if (field === 'notify_2pct') { updates.notify_0_5pct = false; updates.notify_5pct = false; }
         if (field === 'notify_5pct') { updates.notify_0_5pct = false; updates.notify_2pct = false; }
+
         if (field === 'notify_whale_10k') { updates.notify_whale_50k = false; }
         if (field === 'notify_whale_50k') { updates.notify_whale_10k = false; }
       }
+
+      console.log(`Updating sub ${id}:`, updates);
 
       const res = await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "PATCH",
@@ -491,8 +489,8 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
 
       onUpdate();
     } catch (err: any) {
-      console.error(err);
-      setOptimisticSubs(subscriptions);
+      console.error("Toggle error:", err);
+      setOptimisticSubs(subscriptions); // Revert on error
       alert(`Failed to update setting: ${err.message}`);
     }
   };
