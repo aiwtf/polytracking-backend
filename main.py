@@ -185,8 +185,7 @@ class MarketMonitor:
         logger.info("Manual reload triggered via API.")
         self.markets = self.load_markets()
         self.should_reconnect = True
-        if self.ws_connection and not self.ws_connection.closed:
-            pass
+        # Loop will handle reconnection based on self.should_reconnect
 
     async def refresh_subscriptions_loop(self):
         while self.running:
