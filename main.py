@@ -439,6 +439,16 @@ def get_user_status(clerk_user_id: str, db: Session = Depends(get_db)):
         "chat_id": user.telegram_chat_id
     }
 
+@app.post("/api/disconnect_telegram")
+def disconnect_telegram(req: ConnectTelegramRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.clerk_user_id == req.clerk_user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.telegram_chat_id = None
+    db.commit()
+    return {"status": "success", "message": "Telegram disconnected"}
+
 @app.get("/api/subscriptions", response_model=List[SubscriptionResponse])
 def get_subscriptions(clerk_user_id: str, db: Session = Depends(get_db)):
     # Find user

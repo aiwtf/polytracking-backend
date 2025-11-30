@@ -179,19 +179,19 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
       const data = await res.json();
       if (data.status === "success") {
         setToken(data.connection_token);
-        window.open(`https://t.me/${BOT_USERNAME.replace('@', '')}?start=${data.connection_token}`, "_blank");
+        const url = `https://t.me/${BOT_USERNAME.replace('@', '')}?start=${data.connection_token}`;
+        console.log("Opening Telegram URL:", url);
+        window.open(url, "_blank");
       }
-    } catch (err) {
-      alert("Failed to connect Telegram");
+    } catch (err: any) {
+      console.error("Connect error:", err);
+      alert(`Failed to connect Telegram: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDisconnect = async () => {
-    // Placeholder for disconnect logic if needed, or just UI for now as requested
-    // For now, we don't have a disconnect endpoint, so maybe just show alert or do nothing
-    // The user asked for UI layout.
     alert("Disconnect feature coming soon!");
   };
 
@@ -206,22 +206,33 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
         </p>
       </div>
 
-      {connected ? (
+      <div className="flex items-center gap-2">
+        {/* Manual Refresh Button */}
         <button
-          onClick={handleDisconnect}
-          className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+          onClick={onStatusChange}
+          className="p-2 text-gray-400 hover:text-gray-600 transition"
+          title="Refresh Status"
         >
-          Disconnect
+          <Activity size={16} />
         </button>
-      ) : (
-        <button
-          onClick={handleConnect}
-          disabled={loading}
-          className="bg-black text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition"
-        >
-          {loading ? "..." : "Connect"}
-        </button>
-      )}
+
+        {connected ? (
+          <button
+            onClick={handleDisconnect}
+            className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            onClick={handleConnect}
+            disabled={loading}
+            className="bg-black text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition"
+          >
+            {loading ? "..." : "Connect"}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -466,17 +477,45 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
         if (field === 'notify_whale_50k') { updates.notify_whale_10k = false; }
       }
 
-      await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
+      const res = await fetch(`${API_URL}/api/subscriptions/${id}?clerk_user_id=${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.detail || res.statusText || "Unknown error";
+        throw new Error(`Server returned ${res.status}: ${errMsg}`);
+      }
+
       onUpdate();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setOptimisticSubs(subscriptions);
-      alert("Failed to update setting.");
+      alert(`Failed to update setting: ${err.message}`);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!userId) return;
+    if (!confirm("Disconnect Telegram? You will stop receiving alerts.")) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/disconnect_telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clerk_user_id: userId }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to disconnect");
+      }
+
+      onUpdate(); // Refresh status
+      alert("Telegram disconnected.");
+    } catch (err) {
+      alert("Failed to disconnect.");
     }
   };
 
