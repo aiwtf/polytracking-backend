@@ -391,6 +391,7 @@ monitor = MarketMonitor()
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up FastAPI...")
+    logger.info("🚀 STARTING BACKEND V3 (Schema Fix + Test Endpoint) 🚀")
     asyncio.create_task(monitor.start())
     yield
     # Shutdown
