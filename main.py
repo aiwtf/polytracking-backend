@@ -612,16 +612,38 @@ def search_markets(q: str):
     """
     Proxy to Polymarket Gamma API to search for markets.
     Uses /public-search endpoint for better keyword matching.
+    Supports direct Polymarket event URLs.
     """
     if not q:
         return []
     
     # Use public-search endpoint
     url = "https://gamma-api.polymarket.com/public-search"
-    params = {
-        "limit": 100,
-        "q": q
-    }
+    
+    # Check if input is a Polymarket URL
+    if "polymarket.com/event/" in q:
+        try:
+            # Extract slug: https://polymarket.com/event/slug-name?params -> slug-name
+            # Split by 'event/' and take the part after it
+            slug_part = q.split("polymarket.com/event/")[1]
+            # Split by '?' to remove query params and take the first part
+            slug = slug_part.split("?")[0]
+            # Remove any trailing slashes
+            slug = slug.strip("/")
+            
+            params = {"slug": slug}
+        except Exception:
+            # Fallback to normal search if parsing fails
+            params = {
+                "limit": 100,
+                "q": q
+            }
+    else:
+        # Normal keyword search
+        params = {
+            "limit": 100,
+            "q": q
+        }
     
     try:
         response = requests.get(url, params=params, timeout=10)

@@ -159,7 +159,7 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
 
     const interval = setInterval(async () => {
       onStatusChange();
-    }, 2000); // Poll every 2 seconds
+    }, 1000); // Poll every 1 second
 
     return () => clearInterval(interval);
   }, [token, connected, onStatusChange]);
@@ -169,6 +169,15 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
       alert("Please sign in to connect Telegram.");
       return;
     }
+
+    // Open window immediately to prevent popup blocker
+    const newWindow = window.open("about:blank", "_blank");
+    if (!newWindow) {
+      alert("Please allow popups for this site to connect Telegram.");
+      return;
+    }
+    newWindow.document.write("Loading Telegram connection...");
+
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/connect_telegram`, {
@@ -181,10 +190,14 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
         setToken(data.connection_token);
         const url = `https://t.me/${BOT_USERNAME.replace('@', '')}?start=${data.connection_token}`;
         console.log("Opening Telegram URL:", url);
-        window.open(url, "_blank");
+        newWindow.location.href = url;
+      } else {
+        newWindow.close();
+        alert("Failed to get connection token.");
       }
     } catch (err: any) {
       console.error("Connect error:", err);
+      newWindow.close();
       alert(`Failed to connect Telegram: ${err.message}`);
     } finally {
       setLoading(false);
@@ -192,7 +205,25 @@ function TelegramSection({ userId, connected, onStatusChange }: { userId: string
   };
 
   const handleDisconnect = async () => {
-    alert("Disconnect feature coming soon!");
+    if (!userId) return;
+    if (!confirm("Disconnect Telegram? You will stop receiving alerts.")) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/disconnect_telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clerk_user_id: userId }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to disconnect");
+      }
+
+      onStatusChange(); // Refresh status
+      alert("Telegram disconnected.");
+    } catch (err) {
+      alert("Failed to disconnect.");
+    }
   };
 
   return (
@@ -242,7 +273,7 @@ function SearchSection({ userId, onSubscribe }: { userId: string | undefined | n
   const [debouncedQuery] = useDebounce(query, 500);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<{ title: string, name: string, asset_id: string } | null>(null);
+  const [selectedOption, setSelectedOption] = useState<{ title: string, name: string, asset_id: string, image: string } | null>(null);
 
   useEffect(() => {
     if (!debouncedQuery) {
@@ -267,7 +298,7 @@ function SearchSection({ userId, onSubscribe }: { userId: string | undefined | n
       <div className="relative">
         <input
           type="text"
-          placeholder="Search (e.g. 'Bitcoin', 'Election')..."
+          placeholder="Search events or paste Polymarket URL..."
           className="w-full p-3 pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -287,7 +318,7 @@ function SearchSection({ userId, onSubscribe }: { userId: string | undefined | n
                 {result.options.map((opt) => (
                   <button
                     key={opt.asset_id}
-                    onClick={() => setSelectedOption({ title: result.title, name: opt.name, asset_id: opt.asset_id })}
+                    onClick={() => setSelectedOption({ title: result.title, name: opt.name, asset_id: opt.asset_id, image: result.image })}
                     className="px-3 py-1 rounded-md text-sm font-medium border border-gray-200 hover:border-blue-500 hover:text-blue-600 transition whitespace-nowrap flex-shrink-0"
                   >
                     {opt.name} <span className="text-gray-400 text-xs ml-1">${opt.current_price.toFixed(2)}</span>
@@ -315,7 +346,7 @@ function SearchSection({ userId, onSubscribe }: { userId: string | undefined | n
   );
 }
 
-function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title: string, name: string, asset_id: string }, userId: string | undefined | null, onClose: () => void, onSuccess: () => void }) {
+function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title: string, name: string, asset_id: string, image: string }, userId: string | undefined | null, onClose: () => void, onSuccess: () => void }) {
   const [config, setConfig] = useState<TrackingConfig>(DEFAULT_CONFIG);
   const [submitting, setSubmitting] = useState(false);
 
@@ -334,6 +365,7 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
           asset_id: option.asset_id,
           title: option.title,
           target_outcome: option.name,
+          image_url: option.image,
           ...config
         }),
       });
@@ -359,7 +391,10 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
         <div className="flex justify-between items-start mb-4">
           <div>
             <h3 className="text-lg font-bold text-gray-900">Track Market</h3>
-            <p className="text-sm text-gray-500 mt-1">{option.title}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <img src={option.image} alt="" className="w-8 h-8 rounded-full object-cover bg-gray-100" />
+              <p className="text-sm text-gray-500 font-medium line-clamp-2">{option.title}</p>
+            </div>
             <div className="mt-2 inline-block bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded">
               {option.name}
             </div>
@@ -375,28 +410,28 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
           <Checkbox
             label="Price changes > 0.5%"
             checked={config.notify_0_5pct}
-            onChange={(c) => setConfig(p => ({ ...p, notify_0_5pct: c }))}
+            onChange={(c) => setConfig(p => ({ ...p, notify_0_5pct: c, ...(c ? { notify_2pct: false, notify_5pct: false } : {}) }))}
           />
           <Checkbox
             label="Price changes > 2%"
             checked={config.notify_2pct}
-            onChange={(c) => setConfig(p => ({ ...p, notify_2pct: c }))}
+            onChange={(c) => setConfig(p => ({ ...p, notify_2pct: c, ...(c ? { notify_0_5pct: false, notify_5pct: false } : {}) }))}
           />
           <Checkbox
             label="Price changes > 5%"
             checked={config.notify_5pct}
-            onChange={(c) => setConfig(p => ({ ...p, notify_5pct: c }))}
+            onChange={(c) => setConfig(p => ({ ...p, notify_5pct: c, ...(c ? { notify_0_5pct: false, notify_2pct: false } : {}) }))}
           />
           <div className="h-px bg-gray-100 my-2"></div>
           <Checkbox
             label="Whale buys > $10k"
             checked={config.notify_whale_10k}
-            onChange={(c) => setConfig(p => ({ ...p, notify_whale_10k: c }))}
+            onChange={(c) => setConfig(p => ({ ...p, notify_whale_10k: c, ...(c ? { notify_whale_50k: false } : {}) }))}
           />
           <Checkbox
             label="Whale buys > $50k"
             checked={config.notify_whale_50k}
-            onChange={(c) => setConfig(p => ({ ...p, notify_whale_50k: c }))}
+            onChange={(c) => setConfig(p => ({ ...p, notify_whale_50k: c, ...(c ? { notify_whale_10k: false } : {}) }))}
           />
         </div>
 
