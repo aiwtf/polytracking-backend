@@ -771,6 +771,35 @@ def test_notification(req: TestNotificationRequest, db: Session = Depends(get_db
     monitor.send_telegram_alert(msg, chat_id=user.telegram_chat_id)
     return {"status": "success", "message": "Test notification sent"}
 
+class SimulateTradeRequest(BaseModel):
+    asset_id: str
+    price: float
+    size: float
+
+@app.post("/api/debug/simulate_trade")
+def simulate_trade(req: SimulateTradeRequest):
+    """
+    Simulate a trade to trigger volatility and whale alerts.
+    Forces a 100% price increase to ensure volatility trigger.
+    """
+    logger.info(f"🧪 SIMULATING TRADE: {req.dict()}")
+    
+    # 1. Force Volatility: Set previous price to 50% of new price
+    # This ensures (new - old) / old = (1 - 0.5) / 0.5 = 1.0 (100% increase)
+    monitor.last_prices[req.asset_id] = req.price * 0.5
+    
+    # 2. Trigger Checks
+    # Check Whale first (independent of price history, just volume)
+    monitor.check_whale(req.asset_id, req.size, req.price)
+    
+    # Check Volatility (will compare req.price against the 0.5*price we just set)
+    monitor.check_volatility(req.asset_id, req.price)
+    
+    return {
+        "status": "simulated", 
+        "message": f"Simulated trade for {req.asset_id} at ${req.price} (Vol: ${req.size*req.price:,.2f})"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
