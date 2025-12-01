@@ -357,17 +357,21 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
     }
     setSubmitting(true);
     try {
+      const payload = {
+        clerk_user_id: userId,
+        asset_id: option.asset_id,
+        title: option.title,
+        target_outcome: option.name,
+        image_url: option.image,
+        ...config
+      };
+
+      console.log("Submitting subscription:", payload);
+
       const res = await fetch(`${API_URL}/api/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clerk_user_id: userId,
-          asset_id: option.asset_id,
-          title: option.title,
-          target_outcome: option.name,
-          image_url: option.image,
-          ...config
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

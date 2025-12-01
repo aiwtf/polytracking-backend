@@ -459,7 +459,7 @@ def get_subscriptions(clerk_user_id: str, db: Session = Depends(get_db)):
 
 @app.post("/api/subscribe")
 def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
-    logger.info(f"Received subscription request for user {sub_data.clerk_user_id} asset {sub_data.asset_id}")
+    logger.info(f"Received subscription request: {sub_data.dict()}")
     # Find or Create User
     user = db.query(User).filter(User.clerk_user_id == sub_data.clerk_user_id).first()
     if not user:
@@ -486,6 +486,8 @@ def subscribe(sub_data: SubscriptionCreate, db: Session = Depends(get_db)):
         existing.notify_whale_10k = sub_data.notify_whale_10k
         existing.notify_whale_50k = sub_data.notify_whale_50k
         existing.notify_liquidity = sub_data.notify_liquidity
+        if sub_data.image_url:
+            existing.image_url = sub_data.image_url
     else:
         logger.info("Creating new subscription")
         # Create new
