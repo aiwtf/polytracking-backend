@@ -437,6 +437,12 @@ function TrackingModal({ option, userId, onClose, onSuccess }: { option: { title
             checked={config.notify_whale_50k}
             onChange={(c) => setConfig(p => ({ ...p, notify_whale_50k: c, ...(c ? { notify_whale_10k: false } : {}) }))}
           />
+          <div className="h-px bg-gray-100 my-2"></div>
+          <Checkbox
+            label="Liquidity Spike"
+            checked={config.notify_liquidity}
+            onChange={(c) => setConfig(p => ({ ...p, notify_liquidity: c }))}
+          />
         </div>
 
         <button
@@ -647,6 +653,8 @@ function SubscriptionList({ subscriptions, userId, onUpdate }: { subscriptions: 
               <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
               <Toggle icon={<Fish size={14} />} label="10k" active={sub.notify_whale_10k} onClick={() => handleToggle(sub.id, 'notify_whale_10k', !sub.notify_whale_10k)} />
               <Toggle icon={<Anchor size={14} />} label="50k" active={sub.notify_whale_50k} onClick={() => handleToggle(sub.id, 'notify_whale_50k', !sub.notify_whale_50k)} />
+              <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
+              <Toggle icon={<Droplets size={14} />} label="Liq" active={sub.notify_liquidity} onClick={() => handleToggle(sub.id, 'notify_liquidity', !sub.notify_liquidity)} />
             </div>
 
 

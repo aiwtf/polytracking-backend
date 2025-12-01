@@ -228,16 +228,25 @@ class MarketMonitor:
                     self.ws_connection = websocket
                     logger.info(f"Connected to WS. Subscribing to {len(asset_ids)} assets.")
                     
-                    await websocket.send(json.dumps({
-                        "assets_ids": asset_ids,
-                        "type": "market",
-                        "channel": "level2"
-                    }))
-                    await websocket.send(json.dumps({
+                    # Subscribe to markets
+                    # Polymarket CLOB WebSocket expects a list of asset IDs
+                    # Format: {"type": "market", "assets_ids": ["id1", "id2"], "channel": "trades"}
+                    # Note: "assets_ids" is the correct key based on documentation/examples
+                    
+                    sub_msg_trades = {
                         "assets_ids": asset_ids,
                         "type": "market",
                         "channel": "trades"
-                    }))
+                    }
+                    # We can also subscribe to level2 if needed, but trades is primary for price
+                    # sub_msg_level2 = {
+                    #     "assets_ids": asset_ids,
+                    #     "type": "market",
+                    #     "channel": "level2"
+                    # }
+                    
+                    logger.info(f"Sending subscription: {json.dumps(sub_msg_trades)}")
+                    await websocket.send(json.dumps(sub_msg_trades))
                     
                     while not self.should_reconnect and self.running:
                         try:
@@ -245,11 +254,25 @@ class MarketMonitor:
                             if not message:
                                 continue
                             
+                            # Handle Ping/Pong (Polymarket might send raw strings)
+                            if isinstance(message, str):
+                                if "ping" in message.lower():
+                                    await websocket.send("PONG")
+                                    continue
+                                if "pong" in message.lower():
+                                    continue
+
                             try:
                                 data = json.loads(message)
+                                
+                                # Check for error response
+                                if isinstance(data, dict) and "error" in data:
+                                    logger.error(f"WebSocket Error Response: {data}")
+                                    continue
+                                    
                                 await self.process_message(data)
                             except JSONDecodeError:
-                                logger.warning("Received non-JSON message")
+                                logger.warning(f"Received non-JSON message: {message}")
                                 continue
                                 
                         except websockets.exceptions.ConnectionClosed:
