@@ -308,6 +308,10 @@ function SearchSection({ userId, onSubscribe }: { userId: string | undefined | n
 
       {searching && <div className="mt-4 text-center text-gray-400 text-sm">Searching...</div>}
 
+      {!searching && debouncedQuery && results.length === 0 && (
+        <div className="mt-4 text-center text-gray-400 text-sm">No markets found.</div>
+      )}
+
       <div className="mt-4 space-y-3">
         {results.map((result, idx) => (
           <div key={idx} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition border border-transparent hover:border-gray-100">
