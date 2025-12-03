@@ -48,7 +48,7 @@ TELEGRAM_THREAD_ID = int(os.getenv("TELEGRAM_THREAD_ID", "4"))
 WHALE_THRESHOLD_USDC = 50000
 
 # --- Database Setup ---
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -327,12 +327,15 @@ class MarketMonitor:
                 # Use Gamma API to get market data
                 url = "https://gamma-api.polymarket.com/markets"
                 params = {"clob_token_id": asset_id}
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
                 
                 # Use async client if possible, but requests is sync. 
                 # For this implementation, we'll use requests in a thread or just block briefly (not ideal for high load but ok here)
                 # Better: Use aiohttp or run_in_executor
                 loop = asyncio.get_event_loop()
-                response = await loop.run_in_executor(None, lambda: requests.get(url, params=params, timeout=5))
+                response = await loop.run_in_executor(None, lambda: requests.get(url, params=params, headers=headers, timeout=5))
                 
                 if response.ok:
                     data = response.json()
@@ -351,10 +354,15 @@ class MarketMonitor:
                             if idx < len(outcome_prices):
                                 try:
                                     price = float(outcome_prices[idx])
-                                    logger.info(f"Polled {asset_id}: {price}")
+                                    # logger.info(f"Polled {asset_id}: {price}")
                                     self.check_volatility(asset_id, price)
                                 except ValueError:
                                     pass
+                    else:
+                        logger.warning(f"Poll {asset_id}: Empty data received")
+                else:
+                    logger.warning(f"Poll {asset_id} Failed: {response.status_code} - {response.text[:100]}")
+
             except Exception as e:
                 logger.error(f"Error polling {asset_id}: {e}")
             
