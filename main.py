@@ -409,6 +409,10 @@ class MarketMonitor:
         change_pct = (new_price - last_price) / last_price
         abs_change = abs(change_pct)
         
+        # Debug log for volatility
+        if abs_change > 0:
+            logger.info(f"Price update {asset_id}: {last_price} -> {new_price} ({change_pct*100:.4f}%)")
+        
         # Determine Alert Level
         alert_level = None
         if abs_change >= 0.05: alert_level = "5pct"
