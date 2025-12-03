@@ -208,6 +208,8 @@ class MarketMonitor:
         logger.info(f"Starting Monitor. Watching {len(self.markets)} markets.")
         
         asyncio.create_task(self.refresh_subscriptions_loop())
+        # Start Polling Loop as Fallback
+        asyncio.create_task(self.poll_markets_loop())
         
         uri = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
         import websockets
@@ -291,6 +293,72 @@ class MarketMonitor:
             
             # Prevent rapid looping on failure
             await asyncio.sleep(5)
+
+    async def poll_markets_loop(self):
+        """Fallback polling loop in case WS fails"""
+        logger.info("Starting Polling Loop...")
+        while self.running:
+            try:
+                await self.poll_markets()
+            except Exception as e:
+                logger.error(f"Polling Error: {e}")
+            await asyncio.sleep(10) # Poll every 10s
+
+    async def poll_markets(self):
+        if not self.markets:
+            return
+
+        # We need to fetch prices for all subscribed assets
+        # Gamma API allows fetching by clob_token_id, but maybe not in batch efficiently?
+        # Let's try to fetch by market ID if we had it, but we only have asset_id.
+        # For now, we iterate or find a batch endpoint. 
+        # Actually, checking individual assets might be slow if many.
+        # But for MVP with few subs, it's fine. 
+        # Optimization: Fetch top markets or use a broader search?
+        # Better: Use the /markets endpoint with clob_token_id param if it supports multiple?
+        # It seems it might not.
+        # Let's try to fetch individually for now, or group if possible.
+        
+        # To avoid rate limits, let's process in chunks or sequentially with small delay?
+        # Or just do it.
+        
+        for asset_id in list(self.markets.keys()):
+            try:
+                # Use Gamma API to get market data
+                url = "https://gamma-api.polymarket.com/markets"
+                params = {"clob_token_id": asset_id}
+                
+                # Use async client if possible, but requests is sync. 
+                # For this implementation, we'll use requests in a thread or just block briefly (not ideal for high load but ok here)
+                # Better: Use aiohttp or run_in_executor
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(None, lambda: requests.get(url, params=params, timeout=5))
+                
+                if response.ok:
+                    data = response.json()
+                    if isinstance(data, list) and data:
+                        market = data[0]
+                        
+                        # Extract price
+                        clob_ids = market.get("clobTokenIds", [])
+                        if isinstance(clob_ids, str): clob_ids = json.loads(clob_ids)
+                        
+                        outcome_prices = market.get("outcomePrices", [])
+                        if isinstance(outcome_prices, str): outcome_prices = json.loads(outcome_prices)
+                        
+                        if asset_id in clob_ids and outcome_prices:
+                            idx = clob_ids.index(asset_id)
+                            if idx < len(outcome_prices):
+                                try:
+                                    price = float(outcome_prices[idx])
+                                    logger.info(f"Polled {asset_id}: {price}")
+                                    self.check_volatility(asset_id, price)
+                                except ValueError:
+                                    pass
+            except Exception as e:
+                logger.error(f"Error polling {asset_id}: {e}")
+            
+            await asyncio.sleep(0.1) # Rate limit protection
 
     async def process_message(self, data):
         # 兼容性處理：Polymarket 有時傳回 List，有時傳回 Dict
