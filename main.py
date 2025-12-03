@@ -354,7 +354,7 @@ class MarketMonitor:
                             if idx < len(outcome_prices):
                                 try:
                                     price = float(outcome_prices[idx])
-                                    # logger.info(f"Polled {asset_id}: {price}")
+                                    logger.info(f"Polled {asset_id}: {price}")
                                     self.check_volatility(asset_id, price)
                                 except ValueError:
                                     pass
@@ -402,6 +402,7 @@ class MarketMonitor:
         last_price = self.last_prices.get(asset_id)
         if last_price is None:
             self.last_prices[asset_id] = new_price
+            logger.info(f"Init price for {asset_id}: {new_price}")
             return
         if new_price <= 0: return
 
