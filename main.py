@@ -323,6 +323,7 @@ class MarketMonitor:
         # Or just do it.
         
         for asset_id in list(self.markets.keys()):
+            # logger.info(f"Polling check for {asset_id}...")
             try:
                 # Use Gamma API to get market data
                 url = "https://gamma-api.polymarket.com/markets"
@@ -334,7 +335,12 @@ class MarketMonitor:
                 # Use async client if possible, but requests is sync. 
                 # For this implementation, we'll use requests in a thread or just block briefly (not ideal for high load but ok here)
                 # Better: Use aiohttp or run_in_executor
-                loop = asyncio.get_event_loop()
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = asyncio.get_event_loop()
+                
+                # logger.info(f"Sending request for {asset_id}...")
                 response = await loop.run_in_executor(None, lambda: requests.get(url, params=params, headers=headers, timeout=5))
                 
                 if response.ok:
